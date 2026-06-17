@@ -747,25 +747,37 @@ function renderDetail() {
 
   let totalAmt = 0;
   tbody.innerHTML = r.rows.map(row => {
-    const 단가컬럼 = r.usd ? '단가(USD)' : '단가(원)';
-    const 단어수  = parseFloat(row['단어수/시간'] || 0) || 0;
-    const 단가    = parseFloat(row[단가컬럼] || 0) || 0;
-    const 공급가액 = parseFloat(row['공급가액'] || 0) || 0;
+    const 단가컬럼  = r.usd ? '단가(USD)' : '단가(원)';
+    const 단가2컬럼 = r.usd ? '품명2 단가(USD)' : '품명2 단가(원)';
+    const 단어수    = parseFloat(row['단어수/시간'] || 0) || 0;
+    const 단가      = parseFloat(row[단가컬럼] || 0) || 0;
+    const 공급가액  = parseFloat(row['공급가액'] || 0) || 0;
     totalAmt += 공급가액;
-    const 완성물 = String(row['완성물'] || '').trim();
+    const 완성물    = String(row['완성물'] || '').trim();
     const 마감일str = serialToDateStr(row['번역 마감일']);
-    const 품명2 = String(row['품명2'] || '').trim();
-    const 품명표시 = row['품명'] + (품명2 && 품명2 !== 'nan' ? ` <span style="color:#94a3b8;font-size:11px">+${esc(품명2)}</span>` : '');
-    return `<tr>
-      <td class="c">${row['기간 (월)'] || ''}</td>
-      <td class="c">${esc(마감일str)}</td>
-      <td>${esc(String(row['게임명'] || ''))}</td>
-      <td>${품명표시}</td>
+    const 품명2      = String(row['품명2'] || '').trim();
+    const 품명2_단어수 = parseFloat(row['품명2 단어수/시간'] || 0) || 0;
+    const 품명2_단가  = parseFloat(row[단가2컬럼] || 0) || 0;
+    const has2 = 품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0;
+    const linkCell = 완성물 && 완성물.startsWith('http')
+      ? `<a class="link-chip" href="${esc(완성물)}" target="_blank">열기</a>` : '-';
+    const mainRow = `<tr>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${row['기간 (월)'] || ''}</td>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${esc(마감일str)}</td>
+      <td${has2 ? ' rowspan="2"' : ''}>${esc(String(row['게임명'] || ''))}</td>
+      <td>${esc(String(row['품명'] || ''))}</td>
       <td class="r">${단어수 > 0 ? 단어수.toLocaleString('ko-KR') : '-'}</td>
       <td class="r">${fmtAmt(단가, r.usd, false)}</td>
       <td class="r">${fmtAmt(공급가액, r.usd, true)}</td>
-      <td class="c">${완성물 && 완성물.startsWith('http') ? `<a class="link-chip" href="${esc(완성물)}" target="_blank">열기</a>` : '-'}</td>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${linkCell}</td>
     </tr>`;
+    const sub2Row = has2 ? `<tr style="background:#f8faff;">
+      <td style="padding-left:20px;color:#64748b">${esc(품명2)}</td>
+      <td class="r" style="color:#64748b">${품명2_단어수.toLocaleString('ko-KR')}</td>
+      <td class="r" style="color:#64748b">${fmtAmt(품명2_단가, r.usd, false)}</td>
+      <td class="r" style="color:#94a3b8;font-size:12px">포함</td>
+    </tr>` : '';
+    return mainRow + sub2Row;
   }).join('');
 
   const amtStr = r.usd
