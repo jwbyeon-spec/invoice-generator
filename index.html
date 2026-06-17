@@ -671,16 +671,19 @@ function aggregate(rows) {
     const 품명2        = String(r['품명2'] || '').trim();
     const 품명2_단어수 = parseFloat(r['품명2 단어수/시간'] || 0) || 0;
     const 품명2_단가   = parseFloat(r['품명2 단가(원)'] || r['품명2 단가(USD)'] || 0) || 0;
+    const 품명2_공급가액 = (품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0)
+      ? 품명2_단어수 * 품명2_단가 : 0;
     if (key && key !== 'nan') {
       if (!agg[key]) agg[key] = { 표시명: 품명, 단어수: 0, 단가, 공급가액: 0 };
       agg[key].단어수   += 단어수;
-      agg[key].공급가액 += 공급가액;
+      // 엑셀 공급가액에 repetition이 포함되어 있으므로 제외
+      agg[key].공급가액 += 공급가액 - 품명2_공급가액;
     }
-    if (품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0) {
+    if (품명2_공급가액 > 0) {
       const k2 = 품명2.toLowerCase();
       if (!agg[k2]) agg[k2] = { 표시명: 품명2, 단어수: 0, 단가: 품명2_단가, 공급가액: 0 };
       agg[k2].단어수   += 품명2_단어수;
-      agg[k2].공급가액 += 품명2_단어수 * 품명2_단가;
+      agg[k2].공급가액 += 품명2_공급가액;
     }
   }
   return agg;
@@ -961,14 +964,15 @@ function renderDetail() {
     const 단가2컬럼 = r.usd ? '품명2 단가(USD)' : '품명2 단가(원)';
     const 단어수    = parseFloat(row['단어수/시간'] || 0) || 0;
     const 단가      = parseFloat(row[단가컬럼] || 0) || 0;
-    const 공급가액  = parseFloat(row['공급가액'] || 0) || 0;
-    totalAmt += 공급가액;
     const 완성물링크 = row['_완성물_url'] || (String(row['완성물'] || '').trim());
     const 마감일str = serialToDateStr(row['번역 마감일']);
     const 품명2      = String(row['품명2'] || '').trim();
     const 품명2_단어수 = parseFloat(row['품명2 단어수/시간'] || 0) || 0;
     const 품명2_단가  = parseFloat(row[단가2컬럼] || 0) || 0;
     const 품명2_공급가액 = 품명2_단어수 * 품명2_단가;
+    // 엑셀 공급가액에 repetition이 포함되어 있으므로 제외
+    const 공급가액  = (parseFloat(row['공급가액'] || 0) || 0) - 품명2_공급가액;
+    totalAmt += 공급가액 + 품명2_공급가액;
     const has2 = 품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0;
     const linkCell = 완성물링크 && 완성물링크.startsWith('http')
       ? `<a class="link-chip" href="${esc(완성물링크)}" target="_blank">열기</a>` : '-';
