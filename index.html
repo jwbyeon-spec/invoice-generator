@@ -372,7 +372,7 @@ body {
 
   <!-- 관리자 컨트롤 (admin 모드에서만 표시) -->
   <div class="admin-controls" id="admin-controls">
-    <div class="ac-title">🔐 관리자 — PDF 생성 및 Drive 저장</div>
+    <div class="ac-title">🔐 관리자 — PDF 생성</div>
     <div class="admin-date-row">
       <div class="adf"><label>작업개시일</label><input type="date" id="a_date_start"></div>
       <div class="adf"><label>작업완료일</label><input type="date" id="a_date_end"></div>
@@ -380,7 +380,7 @@ body {
       <div class="adf"><label>발행일</label><input type="date" id="a_date_issue"></div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <button class="btn-pdf-bulk" id="btn_pdf_bulk" disabled>📄 선택자 PDF 생성 &amp; Drive 저장</button>
+      <button class="btn-pdf-bulk" id="btn_pdf_bulk" disabled>📄 선택자 PDF 생성</button>
       <span class="admin-select-hint" id="admin-select-hint">이상없음 상태의 카드를 선택하세요</span>
     </div>
     <div class="pdf-progress" id="pdf-progress"></div>
@@ -469,13 +469,13 @@ body {
 // ──────────────────────────────────────────────────────────
 const IS_ADMIN = new URLSearchParams(location.search).has('admin');
 
-const DRIVE_CONFIG = {
-  PARENT_FOLDER_ID: '1leV7ins4pBMnGaoE552CUBbxN66uZvWI',
-  // Google Cloud Console > API > OAuth 2.0 클라이언트 ID 에서 발급
-  // Authorized JavaScript origins 에 https://jwbyeon-spec.github.io 추가 필요
-  CLIENT_ID: '',  // ← 여기에 붙여넣기
-  SCOPE: 'https://www.googleapis.com/auth/drive.file',
-};
+// ── 향후 Drive 연동 시 활성화 ──────────────────────────────
+// const DRIVE_CONFIG = {
+//   PARENT_FOLDER_ID: '1leV7ins4pBMnGaoE552CUBbxN66uZvWI',
+//   CLIENT_ID: '',
+//   SCOPE: 'https://www.googleapis.com/auth/drive.file',
+// };
+// ───────────────────────────────────────────────────────────
 
 // ──────────────────────────────────────────────────────────
 // 상수
@@ -866,15 +866,25 @@ function renderDashboard(month) {
       ? `<input type="checkbox" class="fl-card-checkbox" id="chk_${i}"
            onclick="event.stopPropagation(); toggleCardSelect(${i}, this)">`
       : '';
-    const pdfStatusHtml = IS_ADMIN ? `
-      <div style="padding:8px 18px 10px;border-top:1px solid #f0f0f0">
-        ${pdfDone
-          ? `<span class="pdf-badge done">PDF생성완료</span>
-             <span style="font-size:11px;color:#64748b;margin-left:6px">${state.pdfGeneratedAt ? new Date(state.pdfGeneratedAt).toLocaleString('ko-KR') : ''}</span>
-             ${state.driveLink ? `<a class="fl-drive-link" href="${state.driveLink}" target="_blank">📁 Drive에서 열기</a>` : ''}
-             <button class="btn-pdf-regen" onclick="event.stopPropagation(); regenPdf(${i})">재생성</button>`
-          : `<span class="pdf-badge pending">${confirmed ? 'PDF 미생성' : '미확인'}</span>`}
-      </div>` : '';
+    let pdfStatusHtml = '';
+    if (IS_ADMIN) {
+      if (pdfDone) {
+        const genTime = state.pdfGeneratedAt
+          ? new Date(state.pdfGeneratedAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+          : '';
+        pdfStatusHtml = `
+          <div style="padding:8px 18px 12px;border-top:1px solid #f0f0f0">
+            <span class="pdf-badge done">PDF생성완료</span>
+            <span style="font-size:11px;color:#64748b;margin-left:6px">생성일시: ${genTime}</span><br>
+            <button class="btn-pdf-regen" onclick="event.stopPropagation(); regenPdf(${i})">재생성</button>
+          </div>`;
+      } else {
+        pdfStatusHtml = `
+          <div style="padding:8px 18px 10px;border-top:1px solid #f0f0f0">
+            <span class="pdf-badge pending">${confirmed ? 'PDF 미생성' : '미확인'}</span>
+          </div>`;
+      }
+    }
 
     return `
     <div class="fl-card" id="fl-card-${i}" onclick="goToDetail(${i})">
@@ -1148,89 +1158,7 @@ async function generatePdfBlob(result, dates) {
 }
 
 // ──────────────────────────────────────────────────────────
-// Google Drive 연동
-// ──────────────────────────────────────────────────────────
-let g_driveToken = null;
-
-async function getDriveToken() {
-  if (g_driveToken && g_driveToken.expires_at > Date.now() + 60000) return g_driveToken.access_token;
-  if (!DRIVE_CONFIG.CLIENT_ID) throw new Error('DRIVE_CONFIG.CLIENT_ID가 설정되지 않았습니다.\nindex.html 상단 DRIVE_CONFIG.CLIENT_ID에 OAuth 클라이언트 ID를 입력해주세요.');
-
-  // Google Identity Services 동적 로드
-  await loadScript('https://accounts.google.com/gsi/client');
-
-  return new Promise((resolve, reject) => {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: DRIVE_CONFIG.CLIENT_ID,
-      scope: DRIVE_CONFIG.SCOPE,
-      callback: (resp) => {
-        if (resp.error) { reject(new Error(resp.error)); return; }
-        g_driveToken = { access_token: resp.access_token, expires_at: Date.now() + resp.expires_in * 1000 };
-        resolve(resp.access_token);
-      },
-    });
-    client.requestAccessToken({ prompt: 'consent' });
-  });
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-async function driveRequest(method, path, body, token, isUpload) {
-  const base = isUpload ? 'https://www.googleapis.com/upload/drive/v3' : 'https://www.googleapis.com/drive/v3';
-  const res = await fetch(base + path, {
-    method,
-    headers: { Authorization: 'Bearer ' + token, ...(body && !isUpload ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? (isUpload ? body : JSON.stringify(body)) : undefined,
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Drive API 오류 ${res.status}: ${t}`); }
-  return res.status === 204 ? null : res.json();
-}
-
-async function findOrCreateFolder(name, parentId, token) {
-  const q = `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
-  const res = await driveRequest('GET', `/files?q=${encodeURIComponent(q)}&fields=files(id)`, null, token);
-  if (res.files.length > 0) return res.files[0].id;
-  const created = await driveRequest('POST', '/files?fields=id', {
-    name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId],
-  }, token);
-  return created.id;
-}
-
-async function trashExistingFile(filename, folderId, token) {
-  const q = `name='${filename}' and '${folderId}' in parents and trashed=false`;
-  const res = await driveRequest('GET', `/files?q=${encodeURIComponent(q)}&fields=files(id)`, null, token);
-  for (const f of res.files) {
-    await driveRequest('PATCH', `/files/${f.id}`, { trashed: true }, token);
-  }
-}
-
-async function uploadPdfToDrive(blob, filename, folderId, token) {
-  // 기존 동명 파일 휴지통으로
-  await trashExistingFile(filename, folderId, token);
-
-  const metadata = JSON.stringify({ name: filename, parents: [folderId] });
-  const form = new FormData();
-  form.append('metadata', new Blob([metadata], { type: 'application/json' }));
-  form.append('file', blob, filename);
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token },
-    body: form,
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`업로드 실패 ${res.status}: ${t}`); }
-  return res.json();  // { id, webViewLink }
-}
-
-// ──────────────────────────────────────────────────────────
-// 관리자: 선택자 일괄 PDF 생성 + Drive 저장
+// 관리자: 선택자 일괄 PDF 생성 (브라우저 다운로드)
 // ──────────────────────────────────────────────────────────
 document.getElementById('btn_pdf_bulk')?.addEventListener('click', handleBulkPdf);
 
@@ -1238,63 +1166,94 @@ async function handleBulkPdf() {
   const indices = [...g_selected];
   if (!indices.length) return;
 
-  const btn = document.getElementById('btn_pdf_bulk');
+  const btn  = document.getElementById('btn_pdf_bulk');
   const prog = document.getElementById('pdf-progress');
   btn.disabled = true;
-  prog.textContent = 'Google Drive 인증 중...';
 
-  let token;
-  try { token = await getDriveToken(); }
-  catch(e) { prog.textContent = '❌ 인증 실패: ' + e.message; btn.disabled = false; return; }
-
-  const month  = parseInt(document.getElementById('month').value);
-  const year   = parseInt(document.getElementById('year').value);
-  const dates  = getAdminDates();
-  const folder = `${month}월`;
-
-  let monthFolderId;
-  try {
-    prog.textContent = `📁 Drive 폴더 확인 중...`;
-    monthFolderId = await findOrCreateFolder(folder, DRIVE_CONFIG.PARENT_FOLDER_ID, token);
-  } catch(e) { prog.textContent = '❌ 폴더 생성 실패: ' + e.message; btn.disabled = false; return; }
+  const month = parseInt(document.getElementById('month').value);
+  const year  = parseInt(document.getElementById('year').value);
+  const dates = getAdminDates();
 
   for (let i = 0; i < indices.length; i++) {
     const idx = indices[i];
     const r   = g_results[idx];
     const 이름 = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
-    const filename = `${year}.${String(month).padStart(2,'0')}_${이름}_거래명세서.pdf`;
+    const filename = `${year}.${String(month).padStart(2,'0')}_${이름}_거래명세서`;
 
-    prog.textContent = `📄 (${i+1}/${indices.length}) ${이름} PDF 생성 중...`;
+    prog.textContent = `📄 (${i+1}/${indices.length}) ${이름} 생성 중...`;
     try {
       const blob = await generatePdfBlob(r, dates);
-      prog.textContent = `☁️ (${i+1}/${indices.length}) ${이름} Drive 업로드 중...`;
-      const uploaded = await uploadPdfToDrive(blob, filename, monthFolderId, token);
+
+      // 브라우저 다운로드
+      downloadBlob(blob, filename + '.pdf');
 
       const key = confirmStateKey(r.sheetName, month);
       g_confirmState[key] = {
         ...g_confirmState[key],
         status: 'pdf_generated',
         pdfGeneratedAt: new Date().toISOString(),
-        driveLink: uploaded.webViewLink,
-        filename,
+        filename: filename + '.pdf',
+        // driveLink: null  ← 향후 Drive 연동 시 여기에 추가
       };
     } catch(e) {
       prog.textContent = `❌ ${이름} 실패: ${e.message}`;
       await new Promise(r => setTimeout(r, 1500));
     }
+    await new Promise(r => setTimeout(r, 300));
   }
 
   g_selected.clear();
-  prog.textContent = `✅ 완료 (${indices.length}명)`;
+  prog.textContent = `✅ ${indices.length}명 PDF 다운로드 완료`;
   renderDashboard(month);
+  btn.disabled = false;
 }
 
 // 개별 재생성
 async function regenPdf(idx) {
-  g_selected.clear();
-  g_selected.add(idx);
-  await handleBulkPdf();
+  const month = parseInt(document.getElementById('month').value);
+  const year  = parseInt(document.getElementById('year').value);
+  const dates = getAdminDates();
+  const r     = g_results[idx];
+  if (!r) return;
+
+  const btn = document.querySelector(`#fl-card-${idx} .btn-pdf-regen`);
+  if (btn) { btn.textContent = '생성 중...'; btn.disabled = true; }
+
+  const 이름 = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
+  const filename = `${year}.${String(month).padStart(2,'0')}_${이름}_거래명세서`;
+
+  try {
+    const blob = await generatePdfBlob(r, dates);
+    downloadBlob(blob, filename + '.pdf');
+
+    const key = confirmStateKey(r.sheetName, month);
+    g_confirmState[key] = {
+      ...g_confirmState[key],
+      status: 'pdf_generated',
+      pdfGeneratedAt: new Date().toISOString(),
+      filename: filename + '.pdf',
+    };
+    renderDashboard(month);
+  } catch(e) {
+    alert('PDF 생성 실패: ' + e.message);
+    if (btn) { btn.textContent = '재생성'; btn.disabled = false; }
+  }
 }
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── 향후 Drive 연동 시 아래 함수들을 구현 ──────────────────
+// async function uploadToDrive(blob, filename, monthFolderName) { ... }
+// async function findOrCreateMonthFolder(parentId, monthName) { ... }
+// ───────────────────────────────────────────────────────────
 
 // ──────────────────────────────────────────────────────────
 // 거래명세서 생성 (기존 기능)
