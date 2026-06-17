@@ -161,14 +161,9 @@ body {
   font-size: 12px; color: #3b82f6; text-align: right;
 }
 
-/* ── 관리자 전용 ── */
-.admin-badge {
-  background: #7c3aed; color: #fff; font-size: 11px; font-weight: 700;
-  padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle;
-}
 .admin-controls {
   background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-  padding: 18px 22px; margin-bottom: 20px; display: none;
+  padding: 18px 22px; margin-bottom: 20px;
 }
 .admin-controls .ac-title {
   color: #94a3b8; font-size: 12px; font-weight: 600; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .05em;
@@ -467,8 +462,6 @@ body {
 // ──────────────────────────────────────────────────────────
 // 관리자 모드 / Drive 설정
 // ──────────────────────────────────────────────────────────
-const IS_ADMIN = true;
-
 // ── 향후 Drive 연동 시 활성화 ──────────────────────────────
 // const DRIVE_CONFIG = {
 //   PARENT_FOLDER_ID: '1leV7ins4pBMnGaoE552CUBbxN66uZvWI',
@@ -517,12 +510,6 @@ let g_confirmState = {};
 
 // ──────────────────────────────────────────────────────────
 // 초기화
-// ──────────────────────────────────────────────────────────
-// 관리자 모드 초기화
-if (IS_ADMIN) {
-  document.querySelector('h1').innerHTML = '📊 정산 대시보드 <span class="admin-badge">ADMIN</span>';
-  document.getElementById('admin-controls').style.display = 'block';
-}
 
 const now = new Date();
 document.getElementById('year').value = now.getFullYear();
@@ -604,13 +591,10 @@ function setDefaultDates() {
   document.getElementById('date_end').value     = toVal(last);
   document.getElementById('date_inspect').value = toVal(last);
   document.getElementById('date_issue').value   = toVal(now);
-  // 관리자 날짜 동기화
-  if (IS_ADMIN) {
-    document.getElementById('a_date_start').value   = toVal(first);
-    document.getElementById('a_date_end').value     = toVal(last);
-    document.getElementById('a_date_inspect').value = toVal(last);
-    document.getElementById('a_date_issue').value   = toVal(now);
-  }
+  document.getElementById('a_date_start').value   = toVal(first);
+  document.getElementById('a_date_end').value     = toVal(last);
+  document.getElementById('a_date_inspect').value = toVal(last);
+  document.getElementById('a_date_issue').value   = toVal(now);
 }
 
 function getAdminDates() {
@@ -861,29 +845,26 @@ function renderDashboard(month) {
       ? `<div class="fl-card-footer" style="color:#16a34a">✅ 이상없음 제출완료</div>`
       : `<div class="fl-card-footer">상세 내역 보기 →</div>`;
 
-    // 관리자 전용: 체크박스 + PDF 상태
-    const adminCheckbox = (IS_ADMIN && confirmed)
+    const adminCheckbox = confirmed
       ? `<input type="checkbox" class="fl-card-checkbox" id="chk_${i}"
            onclick="event.stopPropagation(); toggleCardSelect(${i}, this)">`
       : '';
     let pdfStatusHtml = '';
-    if (IS_ADMIN) {
-      if (pdfDone) {
-        const genTime = state.pdfGeneratedAt
-          ? new Date(state.pdfGeneratedAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
-          : '';
-        pdfStatusHtml = `
-          <div style="padding:8px 18px 12px;border-top:1px solid #f0f0f0">
-            <span class="pdf-badge done">PDF생성완료</span>
-            <span style="font-size:11px;color:#64748b;margin-left:6px">생성일시: ${genTime}</span><br>
-            <button class="btn-pdf-regen" onclick="event.stopPropagation(); regenPdf(${i})">재생성</button>
-          </div>`;
-      } else {
-        pdfStatusHtml = `
-          <div style="padding:8px 18px 10px;border-top:1px solid #f0f0f0">
-            <span class="pdf-badge pending">${confirmed ? 'PDF 미생성' : '미확인'}</span>
-          </div>`;
-      }
+    if (pdfDone) {
+      const genTime = state.pdfGeneratedAt
+        ? new Date(state.pdfGeneratedAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+        : '';
+      pdfStatusHtml = `
+        <div style="padding:8px 18px 12px;border-top:1px solid #f0f0f0">
+          <span class="pdf-badge done">PDF생성완료</span>
+          <span style="font-size:11px;color:#64748b;margin-left:6px">생성일시: ${genTime}</span><br>
+          <button class="btn-pdf-regen" onclick="event.stopPropagation(); regenPdf(${i})">재생성</button>
+        </div>`;
+    } else {
+      pdfStatusHtml = `
+        <div style="padding:8px 18px 10px;border-top:1px solid #f0f0f0">
+          <span class="pdf-badge pending">${confirmed ? 'PDF 미생성' : '미확인'}</span>
+        </div>`;
     }
 
     return `
@@ -906,7 +887,7 @@ function renderDashboard(month) {
     </div>`;
   }).join('');
 
-  if (IS_ADMIN) updateBulkBtn();
+  updateBulkBtn();
 }
 
 function goToDetail(idx) {
