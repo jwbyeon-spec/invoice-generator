@@ -159,6 +159,34 @@ body {
   font-size: 12px; color: #3b82f6; text-align: right;
 }
 
+/* ── 확인 영역 ── */
+.confirm-box {
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  padding: 24px 28px; margin-top: 20px; display: none;
+}
+.confirm-box .confirm-guide {
+  font-size: 14px; color: #475569; line-height: 1.7; margin-bottom: 18px;
+}
+.confirm-box .confirm-guide a {
+  color: #3b82f6; text-decoration: none;
+}
+.btn-confirm {
+  background: #22c55e; color: #fff; border: none; border-radius: 8px;
+  padding: 12px 28px; font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: background .2s;
+}
+.btn-confirm:hover { background: #16a34a; }
+.btn-confirm:disabled { background: #86efac; cursor: not-allowed; }
+.confirm-done {
+  display: flex; align-items: center; gap: 10px;
+  background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px;
+  padding: 14px 18px;
+}
+.confirm-done .done-icon { font-size: 20px; }
+.confirm-done .done-text { font-size: 14px; color: #15803d; font-weight: 600; }
+.confirm-done .done-time { font-size: 12px; color: #4ade80; margin-top: 2px; }
+
 /* 빈 상태 */
 .empty-state {
   text-align: center; padding: 80px 20px; color: #94a3b8;
@@ -312,6 +340,13 @@ body {
       <tfoot id="detail-tfoot"></tfoot>
     </table>
   </div>
+  <div class="confirm-box" id="confirm-box">
+    <div class="confirm-guide">
+      작업내역에 이상이 있을 경우 Slack으로 담당자에게 연락해주세요.<br>
+      이상이 없다면 아래 버튼을 눌러주세요.
+    </div>
+    <div id="confirm-action"></div>
+  </div>
 </div>
 
 <!-- ── 거래명세서 생성 뷰 ── -->
@@ -384,6 +419,8 @@ const COMPANY = {
 let g_wb        = null;
 let g_listInfo  = {};
 let g_results   = [];   // 현재 월 집계 결과
+// key: "sheetName_월" → { status: 'confirmed', confirmedAt: ISO string }
+let g_confirmState = {};
 
 // ──────────────────────────────────────────────────────────
 // 초기화
@@ -700,6 +737,11 @@ function renderDashboard(month) {
       ? `$${r.소계.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
       : `${fmtNum(r.소계)}원`;
     const currency = r.usd ? 'USD' : 'KRW';
+    const key = confirmStateKey(r.sheetName, month);
+    const confirmed = g_confirmState[key]?.status === 'confirmed';
+    const footerHtml = confirmed
+      ? `<div class="fl-card-footer" style="color:#16a34a">✅ 이상없음 제출완료</div>`
+      : `<div class="fl-card-footer">상세 내역 보기 →</div>`;
     return `
     <div class="fl-card" onclick="goToDetail(${i})">
       <div class="fl-card-header">
@@ -723,7 +765,7 @@ function renderDashboard(month) {
           <span class="currency">${currency}</span>
         </div>
       </div>
-      <div class="fl-card-footer">상세 내역 보기 →</div>
+      ${footerHtml}
     </div>`;
   }).join('');
 }
@@ -838,6 +880,81 @@ function renderDetail() {
     <td class="r" style="padding:11px 14px">${amtStr}</td>
     <td></td>
   </tr>`;
+
+  // 확인 영역
+  renderConfirmBox(r.sheetName, parseInt(document.getElementById('month').value));
+}
+
+// ──────────────────────────────────────────────────────────
+// 프리랜서 확인 영역
+// ──────────────────────────────────────────────────────────
+function confirmStateKey(sheetName, month) {
+  return `${sheetName}_${month}`;
+}
+
+function renderConfirmBox(sheetName, month) {
+  const box = document.getElementById('confirm-box');
+  const actionEl = document.getElementById('confirm-action');
+  box.style.display = 'block';
+
+  const key   = confirmStateKey(sheetName, month);
+  const state = g_confirmState[key];
+
+  if (state && state.status === 'confirmed') {
+    const dt = new Date(state.confirmedAt);
+    const dtStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    actionEl.innerHTML = `
+      <div class="confirm-done">
+        <span class="done-icon">✅</span>
+        <div>
+          <div class="done-text">이상 없음으로 제출되었습니다.</div>
+          <div class="done-time">제출일시: ${dtStr}</div>
+        </div>
+      </div>`;
+  } else {
+    actionEl.innerHTML = `<button class="btn-confirm" onclick="handleConfirm('${sheetName}', ${month})">이상 없음</button>`;
+  }
+}
+
+function handleConfirm(sheetName, month) {
+  const ok = confirm('작업내역을 확인했으며 이상이 없습니다. 제출하시겠습니까?');
+  if (!ok) return;
+
+  const key = confirmStateKey(sheetName, month);
+  g_confirmState[key] = { status: 'confirmed', confirmedAt: new Date().toISOString() };
+
+  // 확인 영역 갱신
+  renderConfirmBox(sheetName, month);
+
+  // 대시보드 카드 상태 갱신
+  updateDashboardCard(sheetName);
+
+  // ── 향후 연결 포인트 ──────────────────────────────────────
+  // onConfirmed(sheetName, month);  // PDF 생성 → Drive 저장 → 상태 변경
+  // ────────────────────────────────────────────────────────
+}
+
+// 향후 PDF 생성 + Drive 저장 + 상태 변경 연결용 함수 (현재 미구현)
+// eslint-disable-next-line no-unused-vars
+async function onConfirmed(sheetName, month) {
+  // 1. PDF 생성
+  // const pdfBlob = await generatePdfBlob(sheetName, month);
+  // 2. Google Drive 지정 폴더에 저장
+  // await uploadToDrive(pdfBlob, `${month}월_${sheetName}.pdf`);
+  // 3. 상태를 'pdf_generated'로 변경
+  // g_confirmState[confirmStateKey(sheetName, month)].status = 'pdf_generated';
+}
+
+function updateDashboardCard(sheetName) {
+  const idx = g_results.findIndex(r => r.sheetName === sheetName);
+  if (idx === -1) return;
+  const card = document.querySelector(`#fl-grid .fl-card:nth-child(${idx + 1})`);
+  if (!card) return;
+  const footer = card.querySelector('.fl-card-footer');
+  if (footer) {
+    footer.style.color = '#16a34a';
+    footer.textContent = '✅ 이상없음 제출완료';
+  }
 }
 
 // ──────────────────────────────────────────────────────────
