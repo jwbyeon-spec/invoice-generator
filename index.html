@@ -3,143 +3,371 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>거래명세서 자동 생성</title>
+<title>프리랜서 정산 대시보드</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
-  background: #f4f6f9;
+  background: #f0f2f5;
   min-height: 100vh;
+  color: #1a1a2e;
+}
+
+/* ── 상단 헤더 ── */
+.app-header {
+  background: #1e293b;
+  padding: 16px 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
-.card {
+.app-header h1 {
+  color: #f1f5f9;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.header-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.upload-btn {
+  position: relative;
+  background: #334155;
+  border: 1.5px dashed #64748b;
+  border-radius: 8px;
+  padding: 7px 16px;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 13px;
+  transition: border-color .2s, background .2s;
+  white-space: nowrap;
+}
+.upload-btn:hover { border-color: #3b82f6; background: #1e3a5f; color: #93c5fd; }
+.upload-btn.has-file { border-color: #22c55e; background: #14532d44; color: #86efac; }
+.upload-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.header-selects { display: flex; align-items: center; gap: 8px; }
+.header-selects label { color: #94a3b8; font-size: 13px; white-space: nowrap; }
+.header-selects select, .header-selects input[type=number] {
+  background: #334155; border: 1.5px solid #475569; border-radius: 6px;
+  color: #e2e8f0; font-size: 13px; padding: 6px 10px; outline: none;
+  font-family: inherit;
+}
+.header-selects select:focus, .header-selects input[type=number]:focus { border-color: #3b82f6; }
+.btn-load {
+  background: #3b82f6; color: #fff; border: none; border-radius: 7px;
+  padding: 8px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: inherit; white-space: nowrap; transition: background .2s;
+}
+.btn-load:hover { background: #2563eb; }
+.btn-load:disabled { background: #475569; cursor: not-allowed; }
+
+/* ── 탭 ── */
+.tabs {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  padding: 48px 40px;
-  width: 100%;
-  max-width: 520px;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  padding: 0 32px;
 }
-h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
-.subtitle { font-size: 14px; color: #888; margin-bottom: 32px; }
-.field { margin-bottom: 20px; }
-label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 8px; }
-.file-box {
-  border: 2px dashed #d0d7e3; border-radius: 10px; padding: 20px;
-  text-align: center; cursor: pointer; transition: border-color .2s; position: relative;
+.tab {
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
 }
-.file-box:hover { border-color: #4f8ef7; }
-.file-box.has-file { border-color: #4f8ef7; background: #f5f8ff; }
-.file-box input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-.file-box .icon { font-size: 28px; margin-bottom: 6px; }
-.file-box .hint { font-size: 13px; color: #aaa; }
-.file-box .name { font-size: 13px; color: #4f8ef7; font-weight: 600; margin-top: 4px; }
-.row { display: flex; gap: 12px; }
-.row .field { flex: 1; }
-.section-divider { border: none; border-top: 1.5px solid #f0f0f0; margin: 8px 0 20px; }
-select, input[type=number], input[type=date] {
-  width: 100%; padding: 11px 13px; border: 1.5px solid #e0e6ef; border-radius: 8px;
-  font-size: 14px; color: #222; outline: none; transition: border-color .2s; font-family: inherit;
+.tab:hover { color: #3b82f6; }
+.tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+/* ── 공통 컨텐츠 영역 ── */
+.view { display: none; padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+.view.active { display: block; }
+
+/* ── 상태 메시지 ── */
+.status-bar {
+  background: #eef3ff; color: #3b82f6;
+  padding: 12px 16px; border-radius: 8px;
+  font-size: 13px; margin-bottom: 20px; display: none;
 }
-select:focus, input[type=number]:focus, input[type=date]:focus { border-color: #4f8ef7; }
-button {
-  width: 100%; padding: 16px; background: #4f8ef7; color: #fff; border: none;
-  border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
-  transition: background .2s; font-family: inherit;
-}
-button:hover { background: #2d6fe0; }
-button:disabled { background: #b0c4e8; cursor: not-allowed; }
-.status { margin-top: 20px; padding: 14px 16px; border-radius: 8px; font-size: 14px; display: none; }
-.status.loading { background: #eef3ff; color: #4f8ef7; display: block; }
-.status.error   { background: #fff0f0; color: #e05050; display: block; }
-.status.success { background: #f0fff4; color: #1b7a46; display: block; }
+.status-bar.error { background: #fff0f0; color: #e05050; }
+.status-bar.success { background: #f0fff4; color: #1b7a46; }
 .spinner {
-  display: inline-block; width: 14px; height: 14px;
-  border: 2px solid #4f8ef7; border-top-color: transparent;
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid currentColor; border-top-color: transparent;
   border-radius: 50%; animation: spin .7s linear infinite;
-  margin-right: 8px; vertical-align: middle;
+  margin-right: 6px; vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 대시보드 ── */
+.summary-bar {
+  display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+}
+.summary-card {
+  background: #fff; border-radius: 12px; padding: 18px 22px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07); flex: 1; min-width: 140px;
+}
+.summary-card .s-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+.summary-card .s-value { font-size: 22px; font-weight: 700; color: #1e293b; }
+.summary-card .s-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+.freelancer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.fl-card {
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  overflow: hidden; cursor: pointer;
+  transition: box-shadow .2s, transform .15s;
+  border: 2px solid transparent;
+}
+.fl-card:hover { box-shadow: 0 4px 16px rgba(59,130,246,.15); transform: translateY(-2px); border-color: #93c5fd; }
+.fl-card-header {
+  background: #f8fafc; padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.fl-name { font-size: 15px; font-weight: 700; color: #1e293b; }
+.fl-lang { font-size: 12px; color: #64748b; background: #e2e8f0; padding: 2px 8px; border-radius: 20px; }
+.fl-card-body { padding: 14px 18px; }
+.fl-stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.fl-stat { text-align: center; flex: 1; }
+.fl-stat .val { font-size: 18px; font-weight: 700; color: #1e293b; }
+.fl-stat .lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.fl-stat-divider { width: 1px; background: #e2e8f0; margin: 0 8px; }
+.fl-amount {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.fl-amount .amt { font-size: 18px; font-weight: 700; color: #1e293b; }
+.fl-amount .currency { font-size: 12px; color: #94a3b8; }
+.fl-card-footer {
+  padding: 10px 18px; border-top: 1px solid #f0f0f0;
+  font-size: 12px; color: #3b82f6; text-align: right;
+}
+
+/* 빈 상태 */
+.empty-state {
+  text-align: center; padding: 80px 20px; color: #94a3b8;
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 15px; }
+
+/* ── 상세 내역 ── */
+.detail-toolbar {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.detail-toolbar label { font-size: 14px; font-weight: 600; color: #475569; }
+.detail-toolbar select {
+  padding: 8px 12px; border: 1.5px solid #e0e6ef; border-radius: 8px;
+  font-size: 14px; color: #222; outline: none; font-family: inherit; min-width: 180px;
+}
+.detail-toolbar select:focus { border-color: #3b82f6; }
+.detail-info {
+  background: #fff; border-radius: 12px; padding: 18px 22px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07); margin-bottom: 20px;
+  display: none;
+}
+.detail-info .info-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+}
+.detail-info .info-item .i-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; }
+.detail-info .info-item .i-value { font-size: 14px; color: #1e293b; font-weight: 500; }
+
+.table-wrap {
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07); overflow: hidden; display: none;
+}
+.detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.detail-table thead tr { background: #f8fafc; }
+.detail-table th {
+  padding: 11px 14px; text-align: left; font-size: 12px;
+  color: #64748b; font-weight: 600; border-bottom: 1.5px solid #e2e8f0;
+  white-space: nowrap;
+}
+.detail-table td {
+  padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle;
+}
+.detail-table tbody tr:last-child td { border-bottom: none; }
+.detail-table tbody tr:hover td { background: #f8fafc; }
+.detail-table .r { text-align: right; }
+.detail-table .c { text-align: center; }
+.detail-table tfoot tr { background: #f0f7ff; }
+.detail-table tfoot td { font-weight: 700; color: #1e293b; border-top: 2px solid #bfdbfe; }
+.link-chip {
+  display: inline-block; background: #eff6ff; color: #3b82f6;
+  border: 1px solid #bfdbfe; border-radius: 5px;
+  padding: 2px 8px; font-size: 11px; text-decoration: none; white-space: nowrap;
+}
+.link-chip:hover { background: #dbeafe; }
+
+/* ── 거래명세서 생성 (기존) ── */
+.invoice-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 8px rgba(0,0,0,.08); padding: 36px 36px;
+  max-width: 520px;
+}
+.invoice-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: #1e293b; }
+.invoice-card .sub { font-size: 13px; color: #94a3b8; margin-bottom: 28px; }
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 7px; }
+.row2 { display: flex; gap: 12px; }
+.row2 .field { flex: 1; }
+.invoice-card select, .invoice-card input[type=date] {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #e0e6ef; border-radius: 8px;
+  font-size: 14px; color: #222; outline: none; font-family: inherit;
+}
+.invoice-card select:focus, .invoice-card input[type=date]:focus { border-color: #3b82f6; }
+.section-divider { border: none; border-top: 1.5px solid #f0f0f0; margin: 6px 0 18px; }
+.btn-invoice {
+  width: 100%; padding: 15px; background: #3b82f6; color: #fff; border: none;
+  border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background .2s; font-family: inherit; margin-top: 4px;
+}
+.btn-invoice:hover { background: #2563eb; }
+.btn-invoice:disabled { background: #b0c4e8; cursor: not-allowed; }
+.inv-status {
+  margin-top: 16px; padding: 12px 15px; border-radius: 8px;
+  font-size: 13px; display: none;
+}
+.inv-status.loading { background: #eef3ff; color: #3b82f6; display: block; }
+.inv-status.error   { background: #fff0f0; color: #e05050; display: block; }
+.inv-status.success { background: #f0fff4; color: #1b7a46; display: block; }
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>📄 거래명세서 자동 생성</h1>
-  <p class="subtitle">데이터 파일 업로드 후 날짜와 월을 설정하면 명세서가 생성돼요</p>
 
-  <div class="field">
-    <label>📊 데이터 파일 (구글시트 엑셀 추출본)</label>
-    <div class="file-box" id="drop_zone">
+<!-- ── 상단 헤더 ── -->
+<div class="app-header">
+  <h1>📊 정산 대시보드</h1>
+  <div class="header-upload">
+    <div class="upload-btn" id="upload_btn">
       <input type="file" accept=".xlsx,.xls" id="data_file">
+      <span id="upload_label">📂 엑셀 파일 업로드</span>
+    </div>
+  </div>
+  <div class="header-selects">
+    <label>연도</label>
+    <input type="number" id="year" min="2020" max="2099" style="width:76px">
+    <label>월</label>
+    <select id="month"></select>
+    <button class="btn-load" id="btn_load">불러오기</button>
+  </div>
+</div>
+
+<!-- ── 탭 ── -->
+<div class="tabs">
+  <div class="tab active" data-tab="dashboard">대시보드</div>
+  <div class="tab" data-tab="detail">상세 내역</div>
+  <div class="tab" data-tab="invoice">거래명세서 생성</div>
+</div>
+
+<!-- ── 대시보드 뷰 ── -->
+<div class="view active" id="view-dashboard">
+  <div class="status-bar" id="dash-status"></div>
+  <div class="summary-bar" id="summary-bar" style="display:none"></div>
+  <div id="fl-grid" class="freelancer-grid">
+    <div class="empty-state" style="grid-column:1/-1">
       <div class="icon">📂</div>
-      <div class="hint">클릭하거나 파일을 여기에 끌어다 놓으세요</div>
-      <div class="name" id="file_name"></div>
+      <p>엑셀 파일을 업로드하고 월을 선택한 뒤 <strong>불러오기</strong>를 클릭하세요</p>
     </div>
   </div>
+</div>
 
-  <hr class="section-divider">
-
-  <div class="row">
-    <div class="field">
-      <label>연도</label>
-      <input type="number" id="year" min="2020" max="2099">
-    </div>
-    <div class="field">
-      <label>월</label>
-      <select id="month"></select>
-    </div>
+<!-- ── 상세 내역 뷰 ── -->
+<div class="view" id="view-detail">
+  <div class="detail-toolbar">
+    <label>프리랜서 선택</label>
+    <select id="detail-select">
+      <option value="">-- 선택하세요 --</option>
+    </select>
   </div>
-
-  <div class="row">
-    <div class="field">
-      <label>작업개시일</label>
-      <input type="date" id="date_start">
-    </div>
-    <div class="field">
-      <label>작업완료일</label>
-      <input type="date" id="date_end">
-    </div>
+  <div class="detail-info" id="detail-info">
+    <div class="info-grid" id="detail-info-grid"></div>
   </div>
-
-  <div class="row">
-    <div class="field">
-      <label>검수완료일</label>
-      <input type="date" id="date_inspect">
-    </div>
-    <div class="field">
-      <label>발행일</label>
-      <input type="date" id="date_issue">
-    </div>
+  <div class="table-wrap" id="detail-table-wrap">
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>월</th><th>마감일</th><th>게임명</th>
+          <th>품명</th><th class="r">단어수/시간</th>
+          <th class="r">단가</th><th class="r">공급가액</th>
+          <th class="c">완성물</th>
+        </tr>
+      </thead>
+      <tbody id="detail-tbody"></tbody>
+      <tfoot id="detail-tfoot"></tfoot>
+    </table>
   </div>
+</div>
 
-  <button id="btn_print" style="margin-top:8px">🖨️ 미리보기 / PDF 저장</button>
-  <div class="status" id="status"></div>
+<!-- ── 거래명세서 생성 뷰 ── -->
+<div class="view" id="view-invoice">
+  <div class="invoice-card">
+    <h2>거래명세서 생성</h2>
+    <p class="sub">날짜를 설정하고 미리보기 / PDF 저장을 진행하세요</p>
+
+    <hr class="section-divider">
+
+    <div class="row2">
+      <div class="field">
+        <label>작업개시일</label>
+        <input type="date" id="date_start">
+      </div>
+      <div class="field">
+        <label>작업완료일</label>
+        <input type="date" id="date_end">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>검수완료일</label>
+        <input type="date" id="date_inspect">
+      </div>
+      <div class="field">
+        <label>발행일</label>
+        <input type="date" id="date_issue">
+      </div>
+    </div>
+
+    <button class="btn-invoice" id="btn_print">🖨️ 미리보기 / PDF 저장</button>
+    <div class="inv-status" id="inv-status"></div>
+  </div>
 </div>
 
 <script>
-// ─────────────────────────────────────────────
-// 설정
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────
+// 상수
+// ──────────────────────────────────────────────────────────
 const SHEET_TO_INFO = {
-  "관정희(TW)":     { 영문명: "KUAN TENG HIN"         },
-  "채민정(TW)":     { 영문명: "TSAI MENG TING"         },
-  "남폰(TH)":       { 영문명: "NUMFON TANOMJIT"        },
-  "니콜라스(PT)":   { 영문명: "RAMOS MILELI NICOLAS"   },
-  "이노우에(JP)":   { 영문명: "KUMI INOUE"             },
-  "피에르(FR)":     { 영문명: "Castelain Pierre Louis" },
-  "박혜은(FR)":     { 영문명: "박혜은"                 },
-  "Anthony(EN)":    { 영문명: "Lee Anthony"            },
-  "신용빈(EN)":     { 영문명: "신용빈"                 },
-  "노우리(EN)":     { 영문명: "노우리"                 },
-  "크리스티나(DE)": { 영문명: "Volk Christina"         },
-  "이은율(DE)":     { 영문명: "YEE EUN YUL"            },
-  "아디티아(IND)":  { 영문명: "MAHENDRA ADYTIA"        },
-  "알버트(IND)":    { 영문명: "Antonio Albert"         },
-  "엘레나(RU)":     { 영문명: "Pai Elena"              },
+  "관정희(TW)":     { 영문명: "KUAN TENG HIN",          언어: "중국어" },
+  "채민정(TW)":     { 영문명: "TSAI MENG TING",          언어: "중국어" },
+  "남폰(TH)":       { 영문명: "NUMFON TANOMJIT",         언어: "태국어" },
+  "니콜라스(PT)":   { 영문명: "RAMOS MILELI NICOLAS",    언어: "포르투갈어" },
+  "이노우에(JP)":   { 영문명: "KUMI INOUE",              언어: "일본어" },
+  "피에르(FR)":     { 영문명: "Castelain Pierre Louis",  언어: "프랑스어" },
+  "박혜은(FR)":     { 영문명: "박혜은",                  언어: "프랑스어" },
+  "Anthony(EN)":    { 영문명: "Lee Anthony",             언어: "영어" },
+  "신용빈(EN)":     { 영문명: "신용빈",                  언어: "영어" },
+  "노우리(EN)":     { 영문명: "노우리",                  언어: "영어" },
+  "크리스티나(DE)": { 영문명: "Volk Christina",          언어: "독일어" },
+  "이은율(DE)":     { 영문명: "YEE EUN YUL",             언어: "독일어" },
+  "아디티아(IND)":  { 영문명: "MAHENDRA ADYTIA",         언어: "인도네시아어" },
+  "알버트(IND)":    { 영문명: "Antonio Albert",          언어: "인도네시아어" },
+  "엘레나(RU)":     { 영문명: "Pai Elena",               언어: "러시아어" },
 };
 
 const COMPANY = {
@@ -150,9 +378,16 @@ const COMPANY = {
   mgr:  "변지우",
 };
 
-// ─────────────────────────────────────────────
-// UI 초기화
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────
+// 전역 상태
+// ──────────────────────────────────────────────────────────
+let g_wb        = null;
+let g_listInfo  = {};
+let g_results   = [];   // 현재 월 집계 결과
+
+// ──────────────────────────────────────────────────────────
+// 초기화
+// ──────────────────────────────────────────────────────────
 const now = new Date();
 document.getElementById('year').value = now.getFullYear();
 
@@ -164,48 +399,58 @@ for (let m = 1; m <= 12; m++) {
   if (m === now.getMonth() + 1) opt.selected = true;
   monthSel.appendChild(opt);
 }
-
-// 날짜 기본값: 이번 달 1일 ~ 말일, 검수=말일, 발행=오늘
-function setDefaultDates() {
-  const y = now.getFullYear(), m = now.getMonth();
-  const firstDay = new Date(y, m, 1);
-  const lastDay  = new Date(y, m + 1, 0);
-  const toVal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  document.getElementById('date_start').value   = toVal(firstDay);
-  document.getElementById('date_end').value     = toVal(lastDay);
-  document.getElementById('date_inspect').value = toVal(lastDay);
-  document.getElementById('date_issue').value   = toVal(now);
-}
 setDefaultDates();
 
-// 월 변경 시 날짜 자동 갱신
-monthSel.addEventListener('change', function() {
-  const y = parseInt(document.getElementById('year').value);
-  const m = parseInt(this.value) - 1;
-  const firstDay = new Date(y, m, 1);
-  const lastDay  = new Date(y, m + 1, 0);
-  const toVal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  document.getElementById('date_start').value   = toVal(firstDay);
-  document.getElementById('date_end').value     = toVal(lastDay);
-  document.getElementById('date_inspect').value = toVal(lastDay);
-});
+monthSel.addEventListener('change', setDefaultDates);
+document.getElementById('year').addEventListener('change', setDefaultDates);
 
-document.getElementById('data_file').addEventListener('change', function () {
+document.getElementById('data_file').addEventListener('change', function() {
   const name = this.files[0]?.name || '';
-  document.getElementById('file_name').textContent = name;
-  document.getElementById('drop_zone').classList.toggle('has-file', !!name);
+  const btn = document.getElementById('upload_btn');
+  document.getElementById('upload_label').textContent = name ? '📄 ' + name : '📂 엑셀 파일 업로드';
+  btn.classList.toggle('has-file', !!name);
+  if (this.files[0]) {
+    parseExcel(this.files[0]).then(wb => { g_wb = wb; g_listInfo = loadListInfo(wb); });
+  }
 });
 
-// ─────────────────────────────────────────────
-// Excel 파싱
-// ─────────────────────────────────────────────
+document.getElementById('btn_load').addEventListener('click', loadData);
+document.getElementById('btn_print').addEventListener('click', generateInvoice);
+
+// 탭 전환
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('view-' + this.dataset.tab).classList.add('active');
+  });
+});
+
+// 상세 내역 - 프리랜서 선택
+document.getElementById('detail-select').addEventListener('change', renderDetail);
+
+// ──────────────────────────────────────────────────────────
+// 유틸
+// ──────────────────────────────────────────────────────────
+function setDefaultDates() {
+  const y = parseInt(document.getElementById('year').value) || now.getFullYear();
+  const m = parseInt(document.getElementById('month').value) - 1;
+  const first = new Date(y, m, 1);
+  const last  = new Date(y, m + 1, 0);
+  const toVal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('date_start').value   = toVal(first);
+  document.getElementById('date_end').value     = toVal(last);
+  document.getElementById('date_inspect').value = toVal(last);
+  document.getElementById('date_issue').value   = toVal(now);
+}
+
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
-      try {
-        resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false }));
-      } catch (err) { reject(err); }
+      try { resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false })); }
+      catch(err) { reject(err); }
     };
     reader.onerror = () => reject(new Error('파일 읽기 실패'));
     reader.readAsArrayBuffer(file);
@@ -236,13 +481,12 @@ function aggregate(rows) {
   for (const r of rows) {
     const 품명 = String(r['품명'] || '').trim();
     const key  = 품명.toLowerCase();
-    const 단어수   = parseFloat(r['단어수/시간'] || 0)  || 0;
-    const 단가     = parseFloat(r['단가(원)']    || r['단가(USD)'] || 0) || 0;
-    const 공급가액 = parseFloat(r['공급가액']    || 0)  || 0;
+    const 단어수   = parseFloat(r['단어수/시간'] || 0) || 0;
+    const 단가     = parseFloat(r['단가(원)'] || r['단가(USD)'] || 0) || 0;
+    const 공급가액 = parseFloat(r['공급가액'] || 0) || 0;
     const 품명2        = String(r['품명2'] || '').trim();
     const 품명2_단어수 = parseFloat(r['품명2 단어수/시간'] || 0) || 0;
     const 품명2_단가   = parseFloat(r['품명2 단가(원)'] || r['품명2 단가(USD)'] || 0) || 0;
-
     if (key && key !== 'nan') {
       if (!agg[key]) agg[key] = { 표시명: 품명, 단어수: 0, 단가, 공급가액: 0 };
       agg[key].단어수   += 단어수;
@@ -277,15 +521,21 @@ function serialToKorDate(serial) {
   return korDate(d);
 }
 
+function korDate(d) {
+  if (!d) return '';
+  return `${d.getFullYear()}년 ${String(d.getMonth()+1).padStart(2,'0')}월 ${String(d.getDate()).padStart(2,'0')}일`;
+}
+
 function dateInputToKor(val) {
   if (!val) return '';
   const [y, m, d] = val.split('-');
   return `${y}년 ${m}월 ${d}일`;
 }
 
-function korDate(d) {
-  if (!d) return '';
-  return `${d.getFullYear()}년 ${String(d.getMonth()+1).padStart(2,'0')}월 ${String(d.getDate()).padStart(2,'0')}일`;
+function fmtAmt(n, usd, isZeroOk) {
+  if ((!n && n !== 0) || (n === 0 && !isZeroOk)) return '-';
+  if (usd) return n.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  return Math.round(n).toLocaleString('ko-KR');
 }
 
 function fmtNum(n) {
@@ -297,15 +547,246 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─────────────────────────────────────────────
-// 명세서 CSS
-// ─────────────────────────────────────────────
+function serialToDateStr(serial) {
+  if (!serial) return '';
+  if (typeof serial === 'string') {
+    const s = serial.replace(/\D/g,'');
+    if (s.length === 6) return `20${s.slice(0,2)}.${s.slice(2,4)}.${s.slice(4,6)}`;
+    return serial;
+  }
+  const d = new Date(new Date(1899,11,30).getTime() + Math.round(Number(serial))*86400000);
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ──────────────────────────────────────────────────────────
+// 데이터 로드 (불러오기 버튼)
+// ──────────────────────────────────────────────────────────
+async function loadData() {
+  if (!g_wb) {
+    setDashStatus('error', '엑셀 파일을 먼저 업로드해주세요.');
+    return;
+  }
+  const month = parseInt(document.getElementById('month').value);
+
+  setDashStatus('loading', '<span class="spinner"></span> 데이터 분석 중...');
+  document.getElementById('btn_load').disabled = true;
+
+  try {
+    await new Promise(r => setTimeout(r, 30));
+    g_results = [];
+
+    for (const [sheetName, sheetMeta] of Object.entries(SHEET_TO_INFO)) {
+      const rows = getMonthRows(g_wb, sheetName, month);
+      if (!rows.length) continue;
+      const info = g_listInfo[sheetMeta.영문명];
+      const agg  = aggregate(rows);
+      const usd  = isUSD(g_wb, sheetName);
+      const 소계 = Object.values(agg).reduce((s,v) => s + v.공급가액, 0);
+      g_results.push({ sheetName, sheetMeta, rows, agg, usd, 소계, info });
+    }
+
+    renderDashboard(month);
+    renderDetailSelect();
+
+    if (!g_results.length) {
+      setDashStatus('error', `${month}월 데이터가 없습니다.`);
+    } else {
+      setDashStatus('success', `✅ ${month}월 데이터 ${g_results.length}명 로드 완료`);
+    }
+  } catch(e) {
+    setDashStatus('error', '오류: ' + e.message);
+  } finally {
+    document.getElementById('btn_load').disabled = false;
+  }
+}
+
+function setDashStatus(type, html) {
+  const el = document.getElementById('dash-status');
+  el.className = 'status-bar ' + type;
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// ──────────────────────────────────────────────────────────
+// 대시보드 렌더링
+// ──────────────────────────────────────────────────────────
+function renderDashboard(month) {
+  // 요약 바
+  const totalKRW = g_results.filter(r => !r.usd).reduce((s,r) => s + r.소계, 0);
+  const totalUSD = g_results.filter(r => r.usd).reduce((s,r) => s + r.소계, 0);
+  const totalJobs = g_results.reduce((s,r) => s + r.rows.length, 0);
+
+  const sumBar = document.getElementById('summary-bar');
+  sumBar.style.display = 'flex';
+  sumBar.innerHTML = `
+    <div class="summary-card">
+      <div class="s-label">총 프리랜서</div>
+      <div class="s-value">${g_results.length}<span style="font-size:14px;color:#94a3b8;margin-left:4px">명</span></div>
+      <div class="s-sub">${month}월 작업 참여</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">총 작업건수</div>
+      <div class="s-value">${totalJobs}<span style="font-size:14px;color:#94a3b8;margin-left:4px">건</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">총 정산금액 (KRW)</div>
+      <div class="s-value">${fmtNum(totalKRW)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">원</span></div>
+    </div>
+    ${totalUSD > 0 ? `
+    <div class="summary-card">
+      <div class="s-label">총 정산금액 (USD)</div>
+      <div class="s-value">$${totalUSD.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}</div>
+    </div>` : ''}
+  `;
+
+  // 프리랜서 카드
+  const grid = document.getElementById('fl-grid');
+  if (!g_results.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">🔍</div><p>해당 월에 데이터가 없습니다</p></div>';
+    return;
+  }
+
+  grid.innerHTML = g_results.map((r, i) => {
+    const 이름표시 = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
+    const amtStr = r.usd
+      ? `$${r.소계.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
+      : `${fmtNum(r.소계)}원`;
+    const currency = r.usd ? 'USD' : 'KRW';
+    return `
+    <div class="fl-card" onclick="goToDetail(${i})">
+      <div class="fl-card-header">
+        <span class="fl-name">${esc(이름표시)} <span style="font-size:12px;font-weight:400;color:#94a3b8">(${esc(r.sheetMeta.영문명)})</span></span>
+        <span class="fl-lang">${esc(r.sheetMeta.언어)}</span>
+      </div>
+      <div class="fl-card-body">
+        <div class="fl-stat-row">
+          <div class="fl-stat">
+            <div class="val">${r.rows.length}</div>
+            <div class="lbl">작업건수</div>
+          </div>
+          <div class="fl-stat-divider"></div>
+          <div class="fl-stat">
+            <div class="val">${Object.keys(r.agg).length}</div>
+            <div class="lbl">품목수</div>
+          </div>
+        </div>
+        <div class="fl-amount">
+          <span class="amt">${amtStr}</span>
+          <span class="currency">${currency}</span>
+        </div>
+      </div>
+      <div class="fl-card-footer">상세 내역 보기 →</div>
+    </div>`;
+  }).join('');
+}
+
+function goToDetail(idx) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('[data-tab="detail"]').classList.add('active');
+  document.getElementById('view-detail').classList.add('active');
+  const sel = document.getElementById('detail-select');
+  sel.value = idx;
+  renderDetail();
+}
+
+// ──────────────────────────────────────────────────────────
+// 상세 내역
+// ──────────────────────────────────────────────────────────
+function renderDetailSelect() {
+  const sel = document.getElementById('detail-select');
+  sel.innerHTML = '<option value="">-- 선택하세요 --</option>';
+  g_results.forEach((r, i) => {
+    const 이름 = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${이름} (${r.sheetMeta.언어})`;
+    sel.appendChild(opt);
+  });
+}
+
+function renderDetail() {
+  const idx = document.getElementById('detail-select').value;
+  const infoBox = document.getElementById('detail-info');
+  const tableWrap = document.getElementById('detail-table-wrap');
+
+  if (idx === '') {
+    infoBox.style.display = 'none';
+    tableWrap.style.display = 'none';
+    return;
+  }
+
+  const r = g_results[parseInt(idx)];
+  if (!r) return;
+
+  // 프리랜서 정보 카드
+  infoBox.style.display = 'block';
+  const info = r.info || {};
+  const infoGrid = document.getElementById('detail-info-grid');
+  const fields = [
+    ['이름', info['이름'] || r.sheetMeta.영문명],
+    ['영문명', info['영문 이름'] || r.sheetMeta.영문명],
+    ['이메일', info['이메일'] || '-'],
+    ['연락처', info['연락처'] || '-'],
+    ['계좌정보', info['계좌정보'] || '-'],
+    ['계약시작', serialToKorDate(info['계약시작']) || '-'],
+    ['언어', r.sheetMeta.언어],
+    ['통화', r.usd ? 'USD' : 'KRW'],
+  ];
+  infoGrid.innerHTML = fields.map(([lbl, val]) => `
+    <div class="info-item">
+      <div class="i-label">${esc(lbl)}</div>
+      <div class="i-value">${esc(String(val))}</div>
+    </div>
+  `).join('');
+
+  // 작업 내역 테이블
+  tableWrap.style.display = 'block';
+  const tbody = document.getElementById('detail-tbody');
+  const tfoot = document.getElementById('detail-tfoot');
+
+  let totalAmt = 0;
+  tbody.innerHTML = r.rows.map(row => {
+    const 단가컬럼 = r.usd ? '단가(USD)' : '단가(원)';
+    const 단어수  = parseFloat(row['단어수/시간'] || 0) || 0;
+    const 단가    = parseFloat(row[단가컬럼] || 0) || 0;
+    const 공급가액 = parseFloat(row['공급가액'] || 0) || 0;
+    totalAmt += 공급가액;
+    const 완성물 = String(row['완성물'] || '').trim();
+    const 마감일str = serialToDateStr(row['번역 마감일']);
+    const 품명2 = String(row['품명2'] || '').trim();
+    const 품명표시 = row['품명'] + (품명2 && 품명2 !== 'nan' ? ` <span style="color:#94a3b8;font-size:11px">+${esc(품명2)}</span>` : '');
+    return `<tr>
+      <td class="c">${row['기간 (월)'] || ''}</td>
+      <td class="c">${esc(마감일str)}</td>
+      <td>${esc(String(row['게임명'] || ''))}</td>
+      <td>${품명표시}</td>
+      <td class="r">${단어수 > 0 ? 단어수.toLocaleString('ko-KR') : '-'}</td>
+      <td class="r">${fmtAmt(단가, r.usd, false)}</td>
+      <td class="r">${fmtAmt(공급가액, r.usd, true)}</td>
+      <td class="c">${완성물 && 완성물.startsWith('http') ? `<a class="link-chip" href="${esc(완성물)}" target="_blank">열기</a>` : '-'}</td>
+    </tr>`;
+  }).join('');
+
+  const amtStr = r.usd
+    ? `$${totalAmt.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
+    : `${fmtNum(totalAmt)}원`;
+
+  tfoot.innerHTML = `<tr>
+    <td colspan="6" class="r" style="padding:11px 14px">합계</td>
+    <td class="r" style="padding:11px 14px">${amtStr}</td>
+    <td></td>
+  </tr>`;
+}
+
+// ──────────────────────────────────────────────────────────
+// 거래명세서 생성 (기존 기능)
+// ──────────────────────────────────────────────────────────
 const INVOICE_CSS = `
   @page { size: A4 portrait; margin: 18mm 15mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Malgun Gothic','맑은 고딕','나눔고딕',sans-serif; font-size: 9.5pt; color: #000; background: #fff; }
   .invoice { width: 100%; max-width: 176mm; margin: 0 auto; padding: 8mm 0; }
-  .page-break { page-break-after: always; height: 0; overflow: hidden; }
   .title { font-size: 12.5pt; font-weight: bold; margin-bottom: 12pt; }
   .contract-text { font-size: 9pt; line-height: 1.65; margin-bottom: 14pt; }
   .section { margin-bottom: 12pt; }
@@ -333,61 +814,46 @@ const INVOICE_CSS = `
   .mgr-row { display: flex; align-items: baseline; margin-top: 4pt; }
 `;
 
-// ─────────────────────────────────────────────
-// 명세서 HTML 생성
-// ─────────────────────────────────────────────
 function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
   const 이름       = String(info['영문 이름'] || info['이름'] || sheetMeta.영문명).trim();
   const 계약일_str = serialToKorDate(info['계약시작']);
   const 신분증번호 = String(info['주민등록번호'] || info['여권번호'] || '');
-  const 주소       = String(info['주소']   || '');
+  const 주소       = String(info['주소'] || '');
   const 연락처     = String(info['연락처'] || '');
 
-  const ds      = dateInputToKor(dates.start);
-  const de      = dateInputToKor(dates.end);
-  const inspect = dateInputToKor(dates.inspect);
-  const issue   = dateInputToKor(dates.issue);
+  const ds = dateInputToKor(dates.start), de = dateInputToKor(dates.end);
+  const inspect = dateInputToKor(dates.inspect), issue = dateInputToKor(dates.issue);
 
   const items = Object.values(agg);
-  const 소계  = items.reduce((s, v) => s + v.공급가액, 0);
+  const 소계  = items.reduce((s,v) => s + v.공급가액, 0);
 
-  // USD: 소계 소수점 3자리 확인 → 총계 올림 여부 결정
   let 세금 = 0, 총계, 특이사항;
   if (usd) {
     const 소계_3 = Math.round(소계 * 1000) / 1000;
     const 소계_2 = Math.round(소계 * 100)  / 100;
     const needsCeil = Math.abs(소계_3 - 소계_2) >= 0.0005;
-    총계      = needsCeil ? Math.ceil(소계 * 100) / 100 : 소계;
-    특이사항  = needsCeil ? '소수점 셋째 자리에서 올림' : '없음';
+    총계     = needsCeil ? Math.ceil(소계 * 100) / 100 : 소계;
+    특이사항 = needsCeil ? '소수점 셋째 자리에서 올림' : '없음';
   } else {
     세금     = Math.floor(소계 * 0.033 / 10) * 10;
     총계     = 소계 - 세금;
     특이사항 = '없음';
   }
 
-  // 금액 포맷 — USD는 소수점 3자리, KRW는 정수
-  const fmtAmt = (n, isZeroOk) => {
-    if ((!n && n !== 0) || (n === 0 && !isZeroOk)) return '-';
-    if (usd) return n.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
-    return Math.round(n).toLocaleString('ko-KR');
-  };
-
-  const 단가헤더     = usd ? '단가(USD)'     : '단가(원)';
+  const _fmtAmt = (n, isZeroOk) => fmtAmt(n, usd, isZeroOk);
+  const 단가헤더 = usd ? '단가(USD)' : '단가(원)';
   const 공급가액헤더 = usd ? '공급가액(USD)' : '공급가액(원)';
 
   let itemRows = '';
   for (let i = 0; i < 6; i++) {
     if (i < items.length) {
       const v = items[i];
-      const 단어수_s   = v.단어수 > 0   ? Number(v.단어수.toFixed(2)).toLocaleString('ko-KR') : '-';
-      const 단가_s     = v.단가 > 0     ? fmtAmt(v.단가, false)    : '-';
-      const 공급가액_s = v.공급가액 > 0 ? fmtAmt(v.공급가액, false) : '-';
       itemRows += `<tr>
         <td class="c">${esc(v.표시명)}</td>
         <td class="c">구글시트, JIRA</td>
-        <td class="r">${단어수_s}</td>
-        <td class="r">${단가_s}</td>
-        <td class="r">${공급가액_s}</td>
+        <td class="r">${v.단어수 > 0 ? Number(v.단어수.toFixed(2)).toLocaleString('ko-KR') : '-'}</td>
+        <td class="r">${_fmtAmt(v.단가, false)}</td>
+        <td class="r">${_fmtAmt(v.공급가액, false)}</td>
       </tr>`;
     } else {
       itemRows += '<tr><td></td><td></td><td></td><td></td><td></td></tr>';
@@ -402,7 +868,6 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
 <div class="invoice">
   <div class="title">첨부 1. 거래명세서</div>
   <p class="contract-text">본 거래 명세서는 ${계약일_str}에 계약 된 ㈜쿡앱스(이하 "갑")와 ${esc(이름)}(이하 "을")간의 포괄적 협력 계약에 따른다.</p>
-
   <div class="section">
     <div class="sec-title">1. 작업내용</div>
     <table class="work">
@@ -413,13 +878,12 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
       </tr></thead>
       <tbody>
         ${itemRows}
-        <tr class="sum"><td class="lbl" colspan="4">소계</td><td class="r">${fmtAmt(소계, true)}</td></tr>
+        <tr class="sum"><td class="lbl" colspan="4">소계</td><td class="r">${_fmtAmt(소계, true)}</td></tr>
         ${taxRow}
-        <tr class="sum total"><td class="lbl" colspan="4">총계</td><td class="r">${fmtAmt(총계, true)}</td></tr>
+        <tr class="sum total"><td class="lbl" colspan="4">총계</td><td class="r">${_fmtAmt(총계, true)}</td></tr>
       </tbody>
     </table>
   </div>
-
   <div class="section">
     <div class="sec-title">2. 작업일정</div>
     <div class="sched">
@@ -427,24 +891,10 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
       <div class="sched-row"><span class="sched-lbl">작업완료일(납품일) :</span><span class="sched-val">${de}</span></div>
     </div>
   </div>
-
-  <div class="section">
-    <div class="sec-title">3. 검수완료일</div>
-    <div class="indent">${inspect}</div>
-  </div>
-
-  <div class="section">
-    <div class="sec-title">4. 대금지급일</div>
-    <div class="indent">검수 완료 후, "을"이 명세서를 수령한 일자로부터 30일 이내 지급</div>
-  </div>
-
-  <div class="section">
-    <div class="sec-title">5. 특이사항</div>
-    <div class="indent">${특이사항}</div>
-  </div>
-
+  <div class="section"><div class="sec-title">3. 검수완료일</div><div class="indent">${inspect}</div></div>
+  <div class="section"><div class="sec-title">4. 대금지급일</div><div class="indent">검수 완료 후, "을"이 명세서를 수령한 일자로부터 30일 이내 지급</div></div>
+  <div class="section"><div class="sec-title">5. 특이사항</div><div class="indent">${특이사항}</div></div>
   <div class="date-line">${issue}</div>
-
   <div class="party">
     <div class="party-title">「갑」</div>
     <div class="party-row"><span class="party-lbl">회사명:</span><span class="party-val">${esc(COMPANY.name)}</span></div>
@@ -452,7 +902,6 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
     <div class="party-row"><span class="party-lbl">사업자번호:</span><span class="party-val">${COMPANY.biz}</span></div>
     <div class="party-row"><span class="party-lbl">대표:</span><span class="party-val">${esc(COMPANY.ceo)}</span><span class="party-stamp">(인)</span></div>
   </div>
-
   <div class="party">
     <div class="party-title">「을」</div>
     <div class="party-row"><span class="party-lbl">신분증번호:</span><span class="party-val">${esc(신분증번호)}</span></div>
@@ -460,33 +909,13 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
     <div class="party-row"><span class="party-lbl">연락처</span><span class="party-val">${esc(연락처)}</span></div>
     <div class="party-row"><span class="party-lbl">성명</span><span class="party-val">${esc(이름)}</span><span class="party-stamp">(인)</span></div>
   </div>
-
   <div class="mgr-row"><span class="party-lbl">담당자:</span><span class="party-val">${esc(COMPANY.mgr)}</span><span class="party-stamp">(인)</span></div>
 </div>`;
 }
 
-function wrapFullHTML(bodyContent) {
-  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><style>${INVOICE_CSS}</style></head><body>${bodyContent}</body></html>`;
-}
-
-// 새 창에서 단일 명세서 인쇄
-function openAndPrint(html) {
-  const w = window.open('', '_blank');
-  if (!w) { alert('팝업이 차단됐습니다. 주소창 오른쪽 팝업 허용 후 다시 시도해주세요.'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => w.print(), 400);
-}
-
-// ─────────────────────────────────────────────
-// 메인 처리
-// ─────────────────────────────────────────────
-async function generate() {
-  const file  = document.getElementById('data_file').files[0];
-  const month = parseInt(document.getElementById('month').value);
-  const year  = parseInt(document.getElementById('year').value);
-
-  if (!file) { setStatus('error', '데이터 파일을 선택해주세요.'); return; }
+async function generateInvoice() {
+  if (!g_wb) { setInvStatus('error', '먼저 상단에서 엑셀 파일을 업로드하고 불러오기를 클릭해주세요.'); return; }
+  if (!g_results.length) { setInvStatus('error', '불러오기를 먼저 실행해주세요.'); return; }
 
   const dates = {
     start:   document.getElementById('date_start').value,
@@ -494,40 +923,27 @@ async function generate() {
     inspect: document.getElementById('date_inspect').value,
     issue:   document.getElementById('date_issue').value,
   };
+  const month = parseInt(document.getElementById('month').value);
 
-  setStatus('loading', '<span class="spinner"></span> 처리 중...');
+  setInvStatus('loading', '<span class="spinner"></span> 처리 중...');
   document.getElementById('btn_print').disabled = true;
 
   try {
-    const wb       = await parseExcel(file);
-    const listInfo = loadListInfo(wb);
-    const results  = [];
+    const results = g_results
+      .filter(r => r.info)
+      .map(r => {
+        const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><style>${INVOICE_CSS}</style></head><body>${makeInvoiceContent(r.info, r.sheetMeta, r.agg, r.usd, dates)}</body></html>`;
+        return { displayName: r.sheetName, html, filename: `${month}월_${r.sheetMeta.영문명}` };
+      });
 
-    for (const [sheetName, sheetMeta] of Object.entries(SHEET_TO_INFO)) {
-      const rows = getMonthRows(wb, sheetName, month);
-      if (!rows.length) continue;
-      const info = listInfo[sheetMeta.영문명];
-      if (!info) continue;
+    if (!results.length) { setInvStatus('error', '명세서 생성 가능한 데이터가 없습니다.'); return; }
 
-      const agg  = aggregate(rows);
-      const usd  = isUSD(wb, sheetName);
-      const html = wrapFullHTML(makeInvoiceContent(info, sheetMeta, agg, usd, dates));
-      results.push({ displayName: sheetName, html, filename: `${month}월_${sheetMeta.영문명}` });
-    }
-
-    if (!results.length) {
-      setStatus('error', `${month}월 데이터가 없습니다.`);
-      return;
-    }
-
-    // 미리보기 창 열기 — 개별/전체 버튼 포함
     const previewWin = window.open('', '_blank');
-    if (!previewWin) { setStatus('error', '팝업이 차단됐습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+    if (!previewWin) { setInvStatus('error', '팝업이 차단됐습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
 
-    // 각 명세서 HTML을 JSON으로 직렬화해서 전달
-    const htmlsJson      = JSON.stringify(results.map(r => r.html));
-    const namesJson      = JSON.stringify(results.map(r => r.displayName));
-    const filenamesJson  = JSON.stringify(results.map(r => r.filename));
+    const htmlsJson     = JSON.stringify(results.map(r => r.html));
+    const namesJson     = JSON.stringify(results.map(r => r.displayName));
+    const filenamesJson = JSON.stringify(results.map(r => r.filename));
 
     const previewBody = `
 <style>
@@ -540,153 +956,70 @@ async function generate() {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     border-bottom: 3px solid #334155;
   }
-  .toolbar .lbl {
-    color: #94a3b8; font-size: 12px; font-family: 'Malgun Gothic', sans-serif;
-    margin-right: 4px; white-space: nowrap;
-  }
+  .toolbar .lbl { color: #94a3b8; font-size: 12px; font-family: 'Malgun Gothic', sans-serif; margin-right: 4px; white-space: nowrap; }
   .toolbar .sep { color: #475569; margin: 0 4px; }
-  .btn-all {
-    background: #3b82f6; color: #fff; border: none; border-radius: 6px;
-    padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
-    font-family: 'Malgun Gothic', sans-serif; white-space: nowrap;
-  }
+  .btn-all { background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Malgun Gothic', sans-serif; white-space: nowrap; }
   .btn-all:hover { background: #2563eb; }
-  .btn-nav {
-    background: #475569; color: #fff; border: none; border-radius: 6px;
-    padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer;
-    font-family: 'Malgun Gothic', sans-serif; white-space: nowrap;
-  }
+  .btn-nav { background: #475569; color: #fff; border: none; border-radius: 6px; padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Malgun Gothic', sans-serif; white-space: nowrap; }
   .btn-nav:hover { background: #334155; }
-  .btn-one {
-    background: #059669; color: #fff; border: none; border-radius: 6px;
-    padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer;
-    font-family: 'Malgun Gothic', sans-serif; white-space: nowrap;
-  }
+  .btn-one { background: #059669; color: #fff; border: none; border-radius: 6px; padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Malgun Gothic', sans-serif; white-space: nowrap; }
   .btn-one:hover { background: #047857; }
-  .invoice-wrap {
-    background: #fff; max-width: 210mm; margin: 20px auto; padding: 0;
-    box-shadow: 0 2px 12px rgba(0,0,0,.15);
-  }
-  .inv-header {
-    background: #f8fafc; border-bottom: 1px solid #e2e8f0;
-    padding: 8px 16px; display: flex; align-items: center; justify-content: space-between;
-  }
+  .invoice-wrap { background: #fff; max-width: 210mm; margin: 20px auto; padding: 0; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+  .inv-header { background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; }
   .inv-name { font-family: 'Malgun Gothic', sans-serif; font-size: 13px; font-weight: 700; color: #334155; }
 </style>
-
 <div class="toolbar">
   <span class="lbl">바로가기 →</span>
   <div id="one_btns"></div>
   <span class="sep">|</span>
   <button class="btn-all" id="btn_all">💾 전체 저장 (${results.length}개)</button>
 </div>
-
 <div id="previews"></div>
-
 <script>
-var HTMLS      = ${htmlsJson};
-var NAMES      = ${namesJson};
-var FILENAMES  = ${filenamesJson};
-
+var HTMLS=${htmlsJson}, NAMES=${namesJson}, FILENAMES=${filenamesJson};
 async function savePDF(idx) {
-  var btn = document.getElementById('save_btn_' + idx);
-  var orig = btn ? btn.textContent : '';
-  if (btn) { btn.textContent = '저장 중...'; btn.disabled = true; }
-
-  var iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:none;background:#fff;';
-  iframe.srcdoc = HTMLS[idx];
+  var btn=document.getElementById('save_btn_'+idx), orig=btn?btn.textContent:'';
+  if(btn){btn.textContent='저장 중...';btn.disabled=true;}
+  var iframe=document.createElement('iframe');
+  iframe.style.cssText='position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:none;background:#fff;';
+  iframe.srcdoc=HTMLS[idx];
   document.body.appendChild(iframe);
-
   try {
-    await new Promise(function(res){ iframe.onload = res; });
-    await new Promise(function(res){ setTimeout(res, 400); });
-
-    var canvas = await html2canvas(iframe.contentDocument.documentElement, {
-      scale: 2, useCORS: true, logging: false,
-      width: 794, height: 1123,
-      windowWidth: 794, windowHeight: 1123,
-      backgroundColor: '#ffffff'
-    });
-
-    var imgData = canvas.toDataURL('image/jpeg', 0.95);
-    var pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    var pw = pdf.internal.pageSize.getWidth();
-    var ph = pdf.internal.pageSize.getHeight();
-    var ih = (canvas.height / canvas.width) * pw;
-
-    // 여러 페이지 처리
-    var pos = 0, left = ih, first = true;
-    while (left > 0) {
-      if (!first) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, -pos, pw, ih);
-      pos += ph; left -= ph; first = false;
-    }
-    pdf.save(FILENAMES[idx] + '.pdf');
-  } catch(e) {
-    alert('PDF 저장 실패: ' + e.message);
-  } finally {
-    document.body.removeChild(iframe);
-    if (btn) { btn.textContent = orig; btn.disabled = false; }
-  }
+    await new Promise(function(res){iframe.onload=res;});
+    await new Promise(function(res){setTimeout(res,400);});
+    var canvas=await html2canvas(iframe.contentDocument.documentElement,{scale:2,useCORS:true,logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123,backgroundColor:'#ffffff'});
+    var imgData=canvas.toDataURL('image/jpeg',0.95);
+    var pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    var pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight();
+    var ih=(canvas.height/canvas.width)*pw;
+    var pos=0,left=ih,first=true;
+    while(left>0){if(!first)pdf.addPage();pdf.addImage(imgData,'JPEG',0,-pos,pw,ih);pos+=ph;left-=ph;first=false;}
+    pdf.save(FILENAMES[idx]+'.pdf');
+  } catch(e){alert('PDF 저장 실패: '+e.message);}
+  finally{document.body.removeChild(iframe);if(btn){btn.textContent=orig;btn.disabled=false;}}
 }
-
 async function saveAll() {
-  var allBtn = document.getElementById('btn_all');
-  allBtn.disabled = true;
-  for (var i = 0; i < HTMLS.length; i++) {
-    allBtn.textContent = '저장 중... (' + (i+1) + '/' + HTMLS.length + ')';
-    await savePDF(i);
-    await new Promise(function(res){ setTimeout(res, 300); });
-  }
-  allBtn.textContent = '💾 전체 저장 (' + HTMLS.length + '개)';
-  allBtn.disabled = false;
+  var allBtn=document.getElementById('btn_all');allBtn.disabled=true;
+  for(var i=0;i<HTMLS.length;i++){allBtn.textContent='저장 중... ('+(i+1)+'/'+HTMLS.length+')';await savePDF(i);await new Promise(function(res){setTimeout(res,300);});}
+  allBtn.textContent='💾 전체 저장 ('+HTMLS.length+'개)';allBtn.disabled=false;
 }
-
-function scrollToInv(i) {
-  var el = document.getElementById('inv_' + i);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-document.getElementById('btn_all').onclick = saveAll;
-
-var oneDiv = document.getElementById('one_btns');
-NAMES.forEach(function(name, i) {
-  var btn = document.createElement('button');
-  btn.className = 'btn-nav';
-  btn.textContent = name;
-  btn.onclick = (function(idx){ return function(){ scrollToInv(idx); }; })(i);
+document.getElementById('btn_all').onclick=saveAll;
+var oneDiv=document.getElementById('one_btns');
+NAMES.forEach(function(name,i){
+  var btn=document.createElement('button');btn.className='btn-nav';btn.textContent=name;
+  btn.onclick=(function(idx){return function(){var el=document.getElementById('inv_'+idx);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});};})(i);
   oneDiv.appendChild(btn);
-  if (i < NAMES.length-1) {
-    var sp = document.createElement('span');
-    sp.style.cssText = 'width:4px;display:inline-block;';
-    oneDiv.appendChild(sp);
-  }
 });
-
-var prevDiv = document.getElementById('previews');
-HTMLS.forEach(function(html, i) {
-  var wrap = document.createElement('div');
-  wrap.className = 'invoice-wrap';
-  wrap.id = 'inv_' + i;
-
-  var header = document.createElement('div');
-  header.className = 'inv-header';
-  header.innerHTML = '<span class="inv-name">' + NAMES[i] + '</span>';
-
-  var btn = document.createElement('button');
-  btn.className = 'btn-one';
-  btn.id = 'save_btn_' + i;
-  btn.textContent = '이 명세서만 저장';
-  btn.onclick = (function(idx){ return function(){ savePDF(idx); }; })(i);
-  header.appendChild(btn);
-  wrap.appendChild(header);
-
-  var iframe = document.createElement('iframe');
-  iframe.style.cssText = 'width:100%;height:297mm;border:none;display:block;';
-  iframe.srcdoc = html;
-  wrap.appendChild(iframe);
-  prevDiv.appendChild(wrap);
+var prevDiv=document.getElementById('previews');
+HTMLS.forEach(function(html,i){
+  var wrap=document.createElement('div');wrap.className='invoice-wrap';wrap.id='inv_'+i;
+  var header=document.createElement('div');header.className='inv-header';
+  header.innerHTML='<span class="inv-name">'+NAMES[i]+'</span>';
+  var btn=document.createElement('button');btn.className='btn-one';btn.id='save_btn_'+i;
+  btn.textContent='이 명세서만 저장';btn.onclick=(function(idx){return function(){savePDF(idx);};})(i);
+  header.appendChild(btn);wrap.appendChild(header);
+  var iframe=document.createElement('iframe');iframe.style.cssText='width:100%;height:297mm;border:none;display:block;';
+  iframe.srcdoc=html;wrap.appendChild(iframe);prevDiv.appendChild(wrap);
 });
 <\/script>`;
 
@@ -695,24 +1028,19 @@ HTMLS.forEach(function(html, i) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
 </head><body>${previewBody}</body></html>`);
     previewWin.document.close();
-
-    setStatus('success', `✅ ${results.length}개 명세서 미리보기가 열렸어요. 각 버튼으로 개별 저장하거나 "전체 저장"으로 모두 저장하세요.`);
-
-  } catch (err) {
-    setStatus('error', '오류: ' + err.message);
-    console.error(err);
+    setInvStatus('success', `✅ ${results.length}개 명세서 미리보기가 열렸어요.`);
+  } catch(e) {
+    setInvStatus('error', '오류: ' + e.message);
   } finally {
     document.getElementById('btn_print').disabled = false;
   }
 }
 
-function setStatus(type, html) {
-  const el = document.getElementById('status');
-  el.className = 'status ' + type;
+function setInvStatus(type, html) {
+  const el = document.getElementById('inv-status');
+  el.className = 'inv-status ' + type;
   el.innerHTML = html;
 }
-
-document.getElementById('btn_print').addEventListener('click', generate);
 </script>
 </body>
 </html>
