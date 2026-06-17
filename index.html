@@ -404,13 +404,38 @@ setDefaultDates();
 monthSel.addEventListener('change', setDefaultDates);
 document.getElementById('year').addEventListener('change', setDefaultDates);
 
-document.getElementById('data_file').addEventListener('change', function() {
-  const name = this.files[0]?.name || '';
+function handleFile(file) {
+  if (!file) return;
   const btn = document.getElementById('upload_btn');
-  document.getElementById('upload_label').textContent = name ? '📄 ' + name : '📂 엑셀 파일 업로드';
-  btn.classList.toggle('has-file', !!name);
-  if (this.files[0]) {
-    parseExcel(this.files[0]).then(wb => { g_wb = wb; g_listInfo = loadListInfo(wb); });
+  document.getElementById('upload_label').textContent = '📄 ' + file.name;
+  btn.classList.add('has-file');
+  parseExcel(file).then(wb => { g_wb = wb; g_listInfo = loadListInfo(wb); });
+}
+
+document.getElementById('data_file').addEventListener('change', function() {
+  handleFile(this.files[0]);
+});
+
+// 드래그 앤 드롭
+const uploadBtn = document.getElementById('upload_btn');
+uploadBtn.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  this.style.borderColor = '#3b82f6';
+  this.style.background  = '#1e3a5f';
+});
+uploadBtn.addEventListener('dragleave', function() {
+  this.style.borderColor = '';
+  this.style.background  = '';
+});
+uploadBtn.addEventListener('drop', function(e) {
+  e.preventDefault();
+  this.style.borderColor = '';
+  this.style.background  = '';
+  const file = e.dataTransfer.files[0];
+  if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+    handleFile(file);
+  } else if (file) {
+    alert('.xlsx 또는 .xls 파일만 업로드 가능합니다.');
   }
 });
 
@@ -472,8 +497,31 @@ function loadListInfo(wb) {
 
 function getMonthRows(wb, sheetName, month) {
   if (!wb.SheetNames.includes(sheetName)) return [];
-  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
-  return rows.filter(r => parseInt(r['기간 (월)'] || 0) === month);
+  const ws = wb.Sheets[sheetName];
+  if (!ws['!ref']) return [];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  // 헤더 → 컬럼 인덱스 매핑
+  const headers = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: range.s.r, c })];
+    if (cell && cell.v != null) headers[String(cell.v).trim()] = c;
+  }
+
+  const result = [];
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    const row = {};
+    for (const [header, c] of Object.entries(headers)) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      row[header] = cell ? (cell.v ?? '') : '';
+      // 완성물 컬럼 하이퍼링크 추출
+      if (header === '완성물' && cell && cell.l && cell.l.Target) {
+        row['_완성물_url'] = cell.l.Target;
+      }
+    }
+    if (parseInt(row['기간 (월)'] || 0) === month) result.push(row);
+  }
+  return result;
 }
 
 function aggregate(rows) {
@@ -753,14 +801,15 @@ function renderDetail() {
     const 단가      = parseFloat(row[단가컬럼] || 0) || 0;
     const 공급가액  = parseFloat(row['공급가액'] || 0) || 0;
     totalAmt += 공급가액;
-    const 완성물    = String(row['완성물'] || '').trim();
+    const 완성물링크 = row['_완성물_url'] || (String(row['완성물'] || '').trim());
     const 마감일str = serialToDateStr(row['번역 마감일']);
     const 품명2      = String(row['품명2'] || '').trim();
     const 품명2_단어수 = parseFloat(row['품명2 단어수/시간'] || 0) || 0;
     const 품명2_단가  = parseFloat(row[단가2컬럼] || 0) || 0;
+    const 품명2_공급가액 = 품명2_단어수 * 품명2_단가;
     const has2 = 품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0;
-    const linkCell = 완성물 && 완성물.startsWith('http')
-      ? `<a class="link-chip" href="${esc(완성물)}" target="_blank">열기</a>` : '-';
+    const linkCell = 완성물링크 && 완성물링크.startsWith('http')
+      ? `<a class="link-chip" href="${esc(완성물링크)}" target="_blank">열기</a>` : '-';
     const mainRow = `<tr>
       <td class="c"${has2 ? ' rowspan="2"' : ''}>${row['기간 (월)'] || ''}</td>
       <td class="c"${has2 ? ' rowspan="2"' : ''}>${esc(마감일str)}</td>
@@ -775,7 +824,7 @@ function renderDetail() {
       <td style="padding-left:20px;color:#64748b">${esc(품명2)}</td>
       <td class="r" style="color:#64748b">${품명2_단어수.toLocaleString('ko-KR')}</td>
       <td class="r" style="color:#64748b">${fmtAmt(품명2_단가, r.usd, false)}</td>
-      <td class="r" style="color:#94a3b8;font-size:12px">포함</td>
+      <td class="r" style="color:#64748b">${fmtAmt(품명2_공급가액, r.usd, true)}</td>
     </tr>` : '';
     return mainRow + sub2Row;
   }).join('');
