@@ -1440,14 +1440,86 @@ async function initTokenMode() {
 
 function renderTokenDetail() {
   const d = g_tokenData.rows_json;
-  g_results = [{ sheetName: g_tokenData.sheet_name, sheetMeta: d.sheetMeta, rows: d.rows, agg: d.agg, usd: d.usd, 소계: d.소계, info: d.info }];
-  document.getElementById('year').value  = g_tokenData.year;
-  document.getElementById('month').value = g_tokenData.month;
-  renderDetailSelect();
-  document.getElementById('detail-select').value = 0;
-  // renderDetail()이 detail-info-grid를 사용하므로 원래 구조 복원
-  document.getElementById('detail-info').innerHTML = '<div class="info-grid" id="detail-info-grid"></div>';
-  renderDetail();
+  const r = { sheetName: g_tokenData.sheet_name, sheetMeta: d.sheetMeta, rows: d.rows, agg: d.agg, usd: d.usd, 소계: d.소계, info: d.info };
+  g_results = [r];
+
+  // 프리랜서 정보 카드
+  const info = r.info || {};
+  const fields = [
+    ['이름', info['이름'] || r.sheetMeta.영문명],
+    ['영문명', info['영문 이름'] || r.sheetMeta.영문명],
+    ['이메일', info['이메일'] || '-'],
+    ['연락처', info['연락처'] || '-'],
+    ['계좌정보', info['계좌정보'] || '-'],
+    ['언어', r.sheetMeta.언어],
+    ['통화', r.usd ? 'USD' : 'KRW'],
+  ];
+  const infoEl = document.getElementById('detail-info');
+  infoEl.innerHTML = `<div class="info-grid" id="detail-info-grid">
+    ${fields.map(([lbl, val]) => `
+      <div class="info-item">
+        <div class="i-label">${esc(lbl)}</div>
+        <div class="i-value">${esc(String(val || '-'))}</div>
+      </div>`).join('')}
+  </div>`;
+  infoEl.style.display = 'block';
+
+  // 작업 내역 테이블
+  const tableWrap = document.getElementById('detail-table-wrap');
+  tableWrap.style.display = 'block';
+
+  let totalAmt = 0;
+  const tbodyHtml = r.rows.map(row => {
+    const 단가컬럼  = r.usd ? '단가(USD)' : '단가(원)';
+    const 단가2컬럼 = r.usd ? '품명2 단가(USD)' : '품명2 단가(원)';
+    const 단어수    = parseFloat(row['단어수/시간'] || 0) || 0;
+    const 단가      = parseFloat(row[단가컬럼] || 0) || 0;
+    const 완성물링크 = row['_완성물_url'] || (String(row['완성물'] || '').trim());
+    const 마감일str = serialToDateStr(row['번역 마감일']);
+    const 품명2      = String(row['품명2'] || '').trim();
+    const 품명2_단어수 = parseFloat(row['품명2 단어수/시간'] || 0) || 0;
+    const 품명2_단가  = parseFloat(row[단가2컬럼] || 0) || 0;
+    const 품명2_공급가액 = 품명2_단어수 * 품명2_단가;
+    const 공급가액  = (parseFloat(row['공급가액'] || 0) || 0) - 품명2_공급가액;
+    totalAmt += 공급가액 + 품명2_공급가액;
+    const has2 = 품명2 && 품명2.toLowerCase() !== 'nan' && 품명2_단어수 > 0;
+    const linkCell = 완성물링크 && 완성물링크.startsWith('http')
+      ? `<a class="link-chip" href="${esc(완성물링크)}" target="_blank">열기</a>` : '-';
+    const mainRow = `<tr>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${row['기간 (월)'] || ''}</td>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${esc(마감일str)}</td>
+      <td${has2 ? ' rowspan="2"' : ''}>${esc(String(row['게임명'] || ''))}</td>
+      <td>${esc(String(row['품명'] || ''))}</td>
+      <td class="r">${단어수 > 0 ? 단어수.toLocaleString('ko-KR') : '-'}</td>
+      <td class="r">${fmtAmt(단가, r.usd, false)}</td>
+      <td class="r">${fmtAmt(공급가액, r.usd, true)}</td>
+      <td class="c"${has2 ? ' rowspan="2"' : ''}>${linkCell}</td>
+    </tr>`;
+    const sub2Row = has2 ? `<tr style="background:#f8faff;">
+      <td style="padding-left:20px;color:#64748b">${esc(품명2)}</td>
+      <td class="r" style="color:#64748b">${품명2_단어수.toLocaleString('ko-KR')}</td>
+      <td class="r" style="color:#64748b">${fmtAmt(품명2_단가, r.usd, false)}</td>
+      <td class="r" style="color:#64748b">${fmtAmt(품명2_공급가액, r.usd, true)}</td>
+    </tr>` : '';
+    return mainRow + sub2Row;
+  }).join('');
+
+  const amtStr = r.usd
+    ? `$${totalAmt.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
+    : `${fmtNum(totalAmt)}원`;
+
+  document.getElementById('detail-tbody').innerHTML = tbodyHtml;
+  document.getElementById('detail-tfoot').innerHTML = `<tr>
+    <td colspan="6" class="r" style="padding:11px 14px">합계</td>
+    <td class="r" style="padding:11px 14px">${amtStr}</td>
+    <td></td>
+  </tr>`;
+
+  // 확인 버튼
+  const box = document.getElementById('confirm-box');
+  const actionEl = document.getElementById('confirm-action');
+  box.style.display = 'block';
+  actionEl.innerHTML = `<button class="btn-confirm" onclick="handleConfirm('${r.sheetName}', ${g_tokenData.month})">이상 없음</button>`;
 }
 
 function showTokenUploadPrompt() {
