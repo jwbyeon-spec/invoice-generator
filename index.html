@@ -300,6 +300,31 @@ body {
 }
 .link-chip:hover { background: #dbeafe; }
 
+/* 링크 복사 버튼 */
+.btn-copy-link {
+  background: none; border: 1px solid #3b82f6; border-radius: 6px;
+  color: #3b82f6; font-size: 11px; padding: 4px 10px; cursor: pointer;
+  font-family: inherit; transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.btn-copy-link:hover { background: #3b82f6; color: #fff; }
+.btn-copy-link.copied { background: #22c55e; border-color: #22c55e; color: #fff; }
+
+/* 토큰 모드 프롬프트 */
+.token-prompt {
+  text-align: center; padding: 40px 20px;
+}
+.token-prompt .token-prompt-icon { font-size: 48px; margin-bottom: 16px; }
+.token-prompt .token-prompt-title { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+.token-prompt .token-prompt-sub { font-size: 14px; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
+.token-upload-label {
+  display: inline-block; background: #3b82f6; color: #fff;
+  border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background .2s;
+}
+.token-upload-label:hover { background: #2563eb; }
+.token-upload-label input[type=file] { display: none; }
+
 /* ── 거래명세서 생성 (기존) ── */
 .invoice-card {
   background: #fff; border-radius: 16px;
@@ -500,6 +525,26 @@ const COMPANY = {
 };
 
 // ──────────────────────────────────────────────────────────
+// Supabase 설정
+// ──────────────────────────────────────────────────────────
+const SUPA_URL = 'https://vhovbdtbwuzjkijgtmpd.supabase.co';
+const SUPA_KEY = 'sb_publishable_Jr_XdZBLC3p9OIOtdhARNA_FVCRlNE8';
+
+async function supaFetch(path, method = 'GET', body = null, prefer = '') {
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': `Bearer ${SUPA_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (prefer) headers['Prefer'] = prefer;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.status === 204 ? null : res.json();
+}
+
+// ──────────────────────────────────────────────────────────
 // 전역 상태
 // ──────────────────────────────────────────────────────────
 let g_wb        = null;
@@ -507,6 +552,11 @@ let g_listInfo  = {};
 let g_results   = [];   // 현재 월 집계 결과
 // key: "sheetName_월" → { status: 'confirmed', confirmedAt: ISO string }
 let g_confirmState = {};
+// key: "sheetName_월" → token string
+let g_tokens    = {};
+// 토큰 모드
+let g_tokenMode = false;
+let g_tokenData = null;
 
 // ──────────────────────────────────────────────────────────
 // 초기화
@@ -526,6 +576,9 @@ setDefaultDates();
 
 monthSel.addEventListener('change', setDefaultDates);
 document.getElementById('year').addEventListener('change', setDefaultDates);
+
+// 토큰 모드 초기화 (프리랜서 전용 뷰)
+initTokenMode();
 
 function handleFile(file) {
   if (!file) return;
@@ -779,6 +832,11 @@ async function loadData() {
       setDashStatus('error', `${month}월 데이터가 없습니다.`);
     } else {
       setDashStatus('success', `✅ ${month}월 데이터 ${g_results.length}명 로드 완료`);
+      // Supabase 토큰 동기화 + 확인 상태 반영
+      const year = parseInt(document.getElementById('year').value);
+      syncTokensToSupabase(year, month).then(() =>
+        loadConfirmStatesFromSupabase(year, month).then(() => renderDashboard(month))
+      ).catch(e => console.error('Supabase 동기화 실패:', e));
     }
   } catch(e) {
     setDashStatus('error', '오류: ' + e.message);
@@ -870,6 +928,16 @@ function renderDashboard(month) {
         </div>`;
     }
 
+    const token = g_tokens[key];
+    const copyLinkHtml = token
+      ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0">
+           <button class="btn-copy-link" id="cpbtn_${i}"
+             onclick="event.stopPropagation(); copyFreelancerLink('${token}', '${esc(이름표시)}', ${i})">
+             🔗 링크 복사
+           </button>
+         </div>`
+      : '';
+
     return `
     <div class="fl-card" id="fl-card-${i}" onclick="goToDetail(${i})">
       ${adminCheckbox}
@@ -886,6 +954,7 @@ function renderDashboard(month) {
         <div class="fl-amount"><span class="amt">${amtStr}</span><span class="currency">${currency}</span></div>
       </div>
       ${footerHtml}
+      ${copyLinkHtml}
       ${pdfStatusHtml}
     </div>`;
   }).join('');
@@ -1040,22 +1109,37 @@ function renderConfirmBox(sheetName, month) {
   }
 }
 
-function handleConfirm(sheetName, month) {
+async function handleConfirm(sheetName, month) {
   const ok = confirm('작업내역을 확인했으며 이상이 없습니다. 제출하시겠습니까?');
   if (!ok) return;
 
   const key = confirmStateKey(sheetName, month);
-  g_confirmState[key] = { status: 'confirmed', confirmedAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  g_confirmState[key] = { status: 'confirmed', confirmedAt: now };
 
-  // 확인 영역 갱신
   renderConfirmBox(sheetName, month);
-
-  // 대시보드 카드 상태 갱신
   updateDashboardCard(sheetName);
 
-  // ── 향후 연결 포인트 ──────────────────────────────────────
-  // onConfirmed(sheetName, month);  // PDF 생성 → Drive 저장 → 상태 변경
-  // ────────────────────────────────────────────────────────
+  // Supabase 업데이트
+  const token = g_tokenMode ? g_tokenData.token : g_tokens[key];
+  if (token) {
+    try {
+      await supaFetch(
+        `freelancer_tokens?token=eq.${encodeURIComponent(token)}`,
+        'PATCH',
+        { status: 'confirmed', confirmed_at: now }
+      );
+    } catch(e) {
+      console.error('Supabase 확인 저장 실패:', e);
+    }
+  }
+
+  // 토큰 모드: 확인 완료 화면으로 전환
+  if (g_tokenMode) {
+    g_tokenData.status = 'confirmed';
+    g_tokenData.confirmed_at = now;
+    showTokenAlreadyConfirmed();
+  }
 }
 
 // 향후 PDF 생성 + Drive 저장 + 상태 변경 연결용 함수 (현재 미구현)
@@ -1173,13 +1257,21 @@ async function handleBulkPdf() {
       downloadBlob(blob, filename + '.pdf');
 
       const key = confirmStateKey(r.sheetName, month);
+      const pdfAt = new Date().toISOString();
       g_confirmState[key] = {
         ...g_confirmState[key],
         status: 'pdf_generated',
-        pdfGeneratedAt: new Date().toISOString(),
+        pdfGeneratedAt: pdfAt,
         filename: filename + '.pdf',
-        // driveLink: null  ← 향후 Drive 연동 시 여기에 추가
       };
+      const token = g_tokens[key];
+      if (token) {
+        supaFetch(
+          `freelancer_tokens?token=eq.${encodeURIComponent(token)}`,
+          'PATCH',
+          { status: 'pdf_generated', pdf_generated_at: pdfAt }
+        ).catch(e => console.error('Supabase PDF 상태 업데이트 실패:', e));
+      }
     } catch(e) {
       prog.textContent = `❌ ${이름} 실패: ${e.message}`;
       await new Promise(r => setTimeout(r, 1500));
@@ -1212,16 +1304,201 @@ async function regenPdf(idx) {
     downloadBlob(blob, filename + '.pdf');
 
     const key = confirmStateKey(r.sheetName, month);
+    const pdfAt = new Date().toISOString();
     g_confirmState[key] = {
       ...g_confirmState[key],
       status: 'pdf_generated',
-      pdfGeneratedAt: new Date().toISOString(),
+      pdfGeneratedAt: pdfAt,
       filename: filename + '.pdf',
     };
+    const token = g_tokens[key];
+    if (token) {
+      supaFetch(
+        `freelancer_tokens?token=eq.${encodeURIComponent(token)}`,
+        'PATCH',
+        { status: 'pdf_generated', pdf_generated_at: pdfAt }
+      ).catch(e => console.error('Supabase PDF 상태 업데이트 실패:', e));
+    }
     renderDashboard(month);
   } catch(e) {
     alert('PDF 생성 실패: ' + e.message);
     if (btn) { btn.textContent = '재생성'; btn.disabled = false; }
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// Supabase 토큰 동기화 / 상태 로드
+// ──────────────────────────────────────────────────────────
+async function syncTokensToSupabase(year, month) {
+  const rows = g_results.map(r => ({
+    sheet_name: r.sheetName,
+    freelancer_name: r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명,
+    month,
+    year,
+  }));
+  if (!rows.length) return;
+  const result = await supaFetch(
+    'freelancer_tokens?on_conflict=sheet_name,month,year',
+    'POST',
+    rows,
+    'resolution=merge-duplicates,return=representation'
+  );
+  if (result) {
+    for (const row of result) {
+      g_tokens[confirmStateKey(row.sheet_name, month)] = row.token;
+    }
+  }
+}
+
+async function loadConfirmStatesFromSupabase(year, month) {
+  const rows = await supaFetch(
+    `freelancer_tokens?month=eq.${month}&year=eq.${year}&select=*`
+  );
+  if (!rows) return;
+  for (const row of rows) {
+    const key = confirmStateKey(row.sheet_name, month);
+    g_tokens[key] = row.token;
+    if (row.status !== 'pending') {
+      g_confirmState[key] = {
+        status: row.status,
+        confirmedAt: row.confirmed_at,
+        pdfGeneratedAt: row.pdf_generated_at,
+      };
+    }
+  }
+}
+
+function copyFreelancerLink(token, name, cardIdx) {
+  const url = `${location.origin}${location.pathname}?token=${token}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById(`cpbtn_${cardIdx}`);
+    if (btn) {
+      btn.textContent = '✅ 복사됨';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '🔗 링크 복사'; btn.classList.remove('copied'); }, 2000);
+    }
+  }).catch(() => {
+    prompt(`${name} 링크를 복사하세요:`, url);
+  });
+}
+
+// ──────────────────────────────────────────────────────────
+// 토큰 모드 (프리랜서 전용 뷰)
+// ──────────────────────────────────────────────────────────
+async function initTokenMode() {
+  const token = new URLSearchParams(location.search).get('token');
+  if (!token) return;
+
+  g_tokenMode = true;
+
+  // 관리자 UI 숨기기
+  document.querySelector('.tabs').style.display = 'none';
+  document.getElementById('admin-controls').style.display = 'none';
+  document.querySelector('.header-upload').style.display = 'none';
+  document.querySelector('.header-selects').style.display = 'none';
+  document.getElementById('btn_load').style.display = 'none';
+
+  // 상세내역 뷰만 표시
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-detail').classList.add('active');
+  document.querySelector('.detail-toolbar').style.display = 'none';
+  document.getElementById('confirm-box').style.display = 'none';
+
+  const infoEl = document.getElementById('detail-info');
+  infoEl.style.display = 'block';
+  infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#64748b">링크 확인 중...</div>`;
+
+  try {
+    const rows = await supaFetch(`freelancer_tokens?token=eq.${encodeURIComponent(token)}&select=*`);
+    if (!rows || !rows.length) {
+      infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">유효하지 않은 링크입니다.</div>`;
+      return;
+    }
+    g_tokenData = rows[0];
+    document.querySelector('.app-header h1').textContent =
+      `${g_tokenData.freelancer_name} — ${g_tokenData.year}년 ${g_tokenData.month}월 작업내역 확인`;
+
+    if (g_tokenData.status === 'confirmed' || g_tokenData.status === 'pdf_generated') {
+      showTokenAlreadyConfirmed();
+    } else {
+      showTokenUploadPrompt();
+    }
+  } catch(e) {
+    infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">오류: ${e.message}</div>`;
+  }
+}
+
+function showTokenUploadPrompt() {
+  const infoEl = document.getElementById('detail-info');
+  infoEl.style.display = 'block';
+  infoEl.innerHTML = `
+    <div class="token-prompt">
+      <div class="token-prompt-icon">📂</div>
+      <p class="token-prompt-title">${esc(g_tokenData.freelancer_name)}님, 안녕하세요</p>
+      <p class="token-prompt-sub">${g_tokenData.year}년 ${g_tokenData.month}월 작업내역을 확인해주세요.<br>
+        담당자에게 전달받은 엑셀 파일을 업로드하면 내역을 볼 수 있습니다.</p>
+      <label class="token-upload-label">
+        📁 엑셀 파일 선택
+        <input type="file" accept=".xlsx,.xls" onchange="handleTokenFileUpload(this.files[0])">
+      </label>
+    </div>`;
+  document.getElementById('detail-table-wrap').style.display = 'none';
+}
+
+function showTokenAlreadyConfirmed() {
+  const dt = g_tokenData.confirmed_at
+    ? new Date(g_tokenData.confirmed_at).toLocaleString('ko-KR') : '';
+  document.getElementById('detail-info').style.display = 'block';
+  document.getElementById('detail-info').innerHTML = `
+    <div class="token-prompt">
+      <div class="token-prompt-icon">✅</div>
+      <p class="token-prompt-title">이미 제출 완료되었습니다</p>
+      <p class="token-prompt-sub">제출일시: ${dt}</p>
+    </div>`;
+  document.getElementById('detail-table-wrap').style.display = 'none';
+  document.getElementById('confirm-box').style.display = 'none';
+}
+
+async function handleTokenFileUpload(file) {
+  if (!file) return;
+  const infoEl = document.getElementById('detail-info');
+  infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#64748b">파일 분석 중...</div>`;
+
+  try {
+    const wb = await parseExcel(file);
+    g_wb = wb;
+    g_listInfo = loadListInfo(wb);
+
+    const month     = g_tokenData.month;
+    const sheetName = g_tokenData.sheet_name;
+
+    if (!SHEET_TO_INFO[sheetName]) {
+      infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">시트를 찾을 수 없습니다. 올바른 파일인지 확인해주세요.</div>`;
+      return;
+    }
+    const sheetMeta = SHEET_TO_INFO[sheetName];
+    const rows = getMonthRows(wb, sheetName, month);
+    if (!rows.length) {
+      infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">${month}월 데이터가 없습니다.</div>`;
+      return;
+    }
+
+    const info = g_listInfo[sheetMeta.영문명];
+    const agg  = aggregate(rows);
+    const usd  = isUSD(wb, sheetName);
+    const 소계 = Object.values(agg).reduce((s,v) => s + v.공급가액, 0);
+    g_results  = [{ sheetName, sheetMeta, rows, agg, usd, 소계, info }];
+
+    // 연도/월 input을 토큰 값으로 설정 (renderDetail 내부에서 읽음)
+    document.getElementById('year').value  = g_tokenData.year;
+    document.getElementById('month').value = g_tokenData.month;
+
+    renderDetailSelect();
+    document.getElementById('detail-select').value = 0;
+    infoEl.style.display = 'none';
+    renderDetail();
+  } catch(e) {
+    infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">오류: ${e.message}</div>`;
   }
 }
 
