@@ -309,6 +309,12 @@ body {
 }
 .btn-copy-link:hover { background: #3b82f6; color: #fff; }
 .btn-copy-link.copied { background: #22c55e; border-color: #22c55e; color: #fff; }
+.btn-reset-confirm {
+  background: none; border: 1px solid #f87171; border-radius: 6px;
+  color: #f87171; font-size: 11px; padding: 4px 10px; cursor: pointer;
+  font-family: inherit; transition: background .15s, color .15s; white-space: nowrap;
+}
+.btn-reset-confirm:hover { background: #f87171; color: #fff; }
 
 /* 토큰 모드 프롬프트 */
 .token-prompt {
@@ -933,11 +939,15 @@ function renderDashboard(month) {
 
     const token = g_tokens[key];
     const copyLinkHtml = token
-      ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0">
+      ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
            <button class="btn-copy-link" id="cpbtn_${i}"
              onclick="event.stopPropagation(); copyFreelancerLink('${token}', '${esc(이름표시)}', ${i})">
              🔗 링크 복사
            </button>
+           ${confirmed ? `<button class="btn-reset-confirm"
+             onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">
+             ↩ 확인 취소
+           </button>` : ''}
          </div>`
       : '';
 
@@ -1392,6 +1402,32 @@ async function loadConfirmStatesFromSupabase(year, month) {
         pdfGeneratedAt: row.pdf_generated_at,
       };
     }
+  }
+}
+
+async function resetConfirm(sheetName, month, cardIdx) {
+  if (!confirm(`${sheetName}의 확인 상태를 초기화하고 프리랜서에게 재확인을 요청하시겠습니까?`)) return;
+  const key = confirmStateKey(sheetName, month);
+  const token = g_tokens[key];
+  const r = g_results.find(r => r.sheetName === sheetName);
+  try {
+    await supaFetch(
+      `freelancer_tokens?token=eq.${encodeURIComponent(token)}`,
+      'PATCH',
+      {
+        status: 'pending',
+        confirmed_at: null,
+        pdf_generated_at: null,
+        rows_json: r ? {
+          sheetMeta: r.sheetMeta, rows: r.rows, agg: r.agg,
+          usd: r.usd, 소계: r.소계, info: r.info || null,
+        } : undefined,
+      }
+    );
+    delete g_confirmState[key];
+    renderDashboard(month);
+  } catch(e) {
+    alert('초기화 실패: ' + e.message);
   }
 }
 
