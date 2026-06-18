@@ -606,9 +606,15 @@ function handleFile(file) {
   reader.onload = e => {
     const ab = e.target.result;
     try {
-      sessionStorage.setItem('excel_name', file.name);
-      sessionStorage.setItem('excel_data', btoa(String.fromCharCode(...new Uint8Array(ab))));
-    } catch(err) { console.warn('sessionStorage 저장 실패:', err); }
+      // 청크 단위로 base64 인코딩 (대용량 파일 스택 오버플로우 방지)
+      const bytes = new Uint8Array(ab);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      }
+      localStorage.setItem('excel_name', file.name);
+      localStorage.setItem('excel_data', btoa(binary));
+    } catch(err) { console.warn('localStorage 저장 실패:', err); }
     const wb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
     g_wb = wb;
     g_listInfo = loadListInfo(wb);
@@ -624,8 +630,8 @@ function setFileLoaded(name) {
 }
 
 function clearExcelFile() {
-  sessionStorage.removeItem('excel_name');
-  sessionStorage.removeItem('excel_data');
+  localStorage.removeItem('excel_name');
+  localStorage.removeItem('excel_data');
   g_wb = null; g_listInfo = {}; g_results = []; g_confirmState = {}; g_tokens = {};
   document.getElementById('upload_label').textContent = '📂 엑셀 파일 업로드';
   document.getElementById('upload_btn').classList.remove('has-file');
@@ -636,10 +642,10 @@ function clearExcelFile() {
   if (g_pollInterval) { clearInterval(g_pollInterval); g_pollInterval = null; }
 }
 
-// 새로고침 후 sessionStorage에서 파일 복원
+// 새로고침 후 localStorage에서 파일 복원
 (function restoreExcelFromSession() {
-  const name = sessionStorage.getItem('excel_name');
-  const data = sessionStorage.getItem('excel_data');
+  const name = localStorage.getItem('excel_name');
+  const data = localStorage.getItem('excel_data');
   if (!name || !data) return;
   try {
     const binary = atob(data);
