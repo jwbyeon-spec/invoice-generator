@@ -1335,6 +1335,14 @@ async function syncTokensToSupabase(year, month) {
     freelancer_name: r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명,
     month,
     year,
+    rows_json: {
+      sheetMeta: r.sheetMeta,
+      rows: r.rows,
+      agg: r.agg,
+      usd: r.usd,
+      소계: r.소계,
+      info: r.info || null,
+    },
   }));
   if (!rows.length) return;
   const result = await supaFetch(
@@ -1420,12 +1428,25 @@ async function initTokenMode() {
 
     if (g_tokenData.status === 'confirmed' || g_tokenData.status === 'pdf_generated') {
       showTokenAlreadyConfirmed();
+    } else if (g_tokenData.rows_json) {
+      renderTokenDetail();
     } else {
       showTokenUploadPrompt();
     }
   } catch(e) {
     infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">오류: ${e.message}</div>`;
   }
+}
+
+function renderTokenDetail() {
+  const d = g_tokenData.rows_json;
+  g_results = [{ sheetName: g_tokenData.sheet_name, sheetMeta: d.sheetMeta, rows: d.rows, agg: d.agg, usd: d.usd, 소계: d.소계, info: d.info }];
+  document.getElementById('year').value  = g_tokenData.year;
+  document.getElementById('month').value = g_tokenData.month;
+  renderDetailSelect();
+  document.getElementById('detail-select').value = 0;
+  document.getElementById('detail-info').style.display = 'none';
+  renderDetail();
 }
 
 function showTokenUploadPrompt() {
