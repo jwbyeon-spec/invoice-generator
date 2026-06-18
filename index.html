@@ -1812,17 +1812,47 @@ async function slackPostMessage(channel, text) {
   return true;
 }
 
-async function lookupSlackUserId(emailsRaw) {
+let g_slackMembersCache = null;
+async function getSlackMembers() {
+  if (g_slackMembersCache) return g_slackMembersCache;
   const token = getSlackToken();
-  if (!token || !emailsRaw) return null;
-  const emails = String(emailsRaw).split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
-  for (const email of emails) {
-    try {
-      const params = new URLSearchParams({ token, email });
-      const res = await fetch('https://slack.com/api/users.lookupByEmail?' + params.toString());
+  if (!token) return [];
+  const members = [];
+  let cursor = '';
+  try {
+    do {
+      const params = new URLSearchParams({ token, limit: 200 });
+      if (cursor) params.set('cursor', cursor);
+      const res = await fetch('https://slack.com/api/users.list?' + params.toString());
       const data = await res.json();
-      if (data.ok && data.user && data.user.id) return data.user.id;
-    } catch(e) {}
+      if (!data.ok) break;
+      members.push(...(data.members || []));
+      cursor = data.response_metadata?.next_cursor || '';
+    } while (cursor);
+    g_slackMembersCache = members;
+  } catch(e) {}
+  return members;
+}
+
+async function lookupSlackUserId(emailsRaw, names) {
+  const members = await getSlackMembers();
+  if (!members.length) return null;
+  const emails = emailsRaw ? String(emailsRaw).split(/[,;\s]+/).map(e => e.trim().toLowerCase()).filter(Boolean) : [];
+  // 이메일로 먼저 찾기
+  for (const m of members) {
+    const mEmail = (m.profile?.email || '').toLowerCase();
+    if (mEmail && emails.includes(mEmail)) return m.id;
+  }
+  // 이름으로 fallback
+  if (names && names.length) {
+    for (const name of names) {
+      const n = name.toLowerCase().replace(/\s/g, '');
+      for (const m of members) {
+        const rn = (m.profile?.real_name || '').toLowerCase().replace(/\s/g, '');
+        const dn = (m.profile?.display_name || '').toLowerCase().replace(/\s/g, '');
+        if (rn.includes(n) || dn.includes(n) || n.includes(rn)) return m.id;
+      }
+    }
   }
   return null;
 }
@@ -1847,7 +1877,8 @@ async function sendOneSlack(idx) {
   if (btn) { btn.textContent = '전송 중...'; btn.disabled = true; }
   try {
     const emails = r.info ? r.info['이메일'] : '';
-    const slackUserId = await lookupSlackUserId(emails);
+    const 영문명 = r.info ? r.info['영문 이름'] : '';
+    const slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
     await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
     if (btn) { btn.textContent = '✅ 전송완료'; btn.classList.add('sent'); }
   } catch(e) {
@@ -1875,7 +1906,8 @@ async function handleBulkSlack() {
     if (!token)   { fail++; continue; }
     try {
       const emails = r.info ? r.info['이메일'] : '';
-      const slackUserId = await lookupSlackUserId(emails);
+      const 영문명 = r.info ? r.info['영문 이름'] : '';
+      const slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
       await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
       ok++;
     } catch(e) { fail++; }
