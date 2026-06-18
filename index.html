@@ -1440,7 +1440,8 @@ async function initTokenMode() {
 
 function renderTokenDetail() {
   const d = g_tokenData.rows_json;
-  const r = { sheetName: g_tokenData.sheet_name, sheetMeta: d.sheetMeta, rows: d.rows, agg: d.agg, usd: d.usd, 소계: d.소계, info: d.info };
+  if (!d) { document.getElementById('detail-info').innerHTML = '<div style="padding:30px;text-align:center;color:#ef4444">데이터가 없습니다. 관리자에게 링크 재발송을 요청하세요.</div>'; return; }
+  const r = { sheetName: g_tokenData.sheet_name, sheetMeta: d.sheetMeta, rows: d.rows || [], agg: d.agg || {}, usd: d.usd, 소계: d.소계 || 0, info: d.info || null };
   g_results = [r];
 
   // 프리랜서 정보 카드
