@@ -190,6 +190,29 @@ body {
   cursor: pointer; font-family: inherit; transition: background .2s, color .2s;
 }
 .btn-select-all:hover { background: #7c3aed; color: #fff; }
+.slack-token-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.btn-slack-save {
+  background: #0ea5e9; color: #fff; border: none; border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+}
+.btn-slack-save:hover { background: #0284c7; }
+.btn-slack-bulk {
+  background: #0ea5e9; color: #fff; border: none; border-radius: 8px;
+  padding: 10px 22px; font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: background .2s; white-space: nowrap;
+}
+.btn-slack-bulk:hover { background: #0284c7; }
+.btn-slack-bulk:disabled { background: #0c4a6e; opacity: .6; cursor: not-allowed; }
+.btn-slack-send {
+  background: none; border: 1px solid #0ea5e9; border-radius: 6px;
+  color: #0ea5e9; font-size: 11px; padding: 4px 10px; cursor: pointer;
+  font-family: inherit; transition: background .15s, color .15s; white-space: nowrap;
+}
+.btn-slack-send:hover { background: #0ea5e9; color: #fff; }
+.btn-slack-send.sent { background: #22c55e; border-color: #22c55e; color: #fff; }
 .btn-clear-file {
   background: none; border: 1px solid #475569; border-radius: 6px;
   color: #94a3b8; font-size: 12px; padding: 5px 10px; cursor: pointer;
@@ -411,7 +434,17 @@ body {
 
   <!-- 관리자 컨트롤 (admin 모드에서만 표시) -->
   <div class="admin-controls" id="admin-controls">
-    <div class="ac-title">🔐 관리자 — PDF 생성</div>
+    <div class="ac-title">🔐 관리자 — PDF 생성 / 슬랙 전송</div>
+
+    <!-- 슬랙 토큰 설정 -->
+    <div class="slack-token-row" id="slack-token-row">
+      <span style="color:#94a3b8;font-size:12px">Slack Token</span>
+      <input type="password" id="slack_token_input" placeholder="xoxp-... 또는 xoxb-..."
+        style="background:#334155;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:12px;padding:5px 10px;outline:none;font-family:inherit;flex:1;min-width:0">
+      <button class="btn-slack-save" onclick="saveSlackToken()">저장</button>
+      <span id="slack_token_status" style="font-size:11px;color:#4ade80"></span>
+    </div>
+
     <div class="admin-date-row">
       <div class="adf"><label>작업개시일</label><input type="date" id="a_date_start"></div>
       <div class="adf"><label>작업완료일</label><input type="date" id="a_date_end"></div>
@@ -420,6 +453,7 @@ body {
     </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn-pdf-bulk" id="btn_pdf_bulk" disabled>📄 선택자 PDF 생성</button>
+      <button class="btn-slack-bulk" id="btn_slack_bulk" disabled onclick="handleBulkSlack()">💬 선택자 슬랙 전송</button>
       <button class="btn-select-all" id="btn_select_all" onclick="selectAllConfirmed()">☑ 전체 선택</button>
       <span class="admin-select-hint" id="admin-select-hint">이상없음 상태의 카드를 선택하세요</span>
     </div>
@@ -1002,12 +1036,17 @@ function renderDashboard(month) {
     }
 
     const token = g_tokens[key];
+    const slackCh = r.info ? String(r.info['slack_channel'] || '').trim() : '';
     const copyLinkHtml = token
       ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
            <button class="btn-copy-link" id="cpbtn_${i}"
              onclick="event.stopPropagation(); copyFreelancerLink('${token}', '${esc(이름표시)}', ${i})">
              🔗 링크 복사
            </button>
+           ${slackCh ? `<button class="btn-slack-send" id="slackbtn_${i}"
+             onclick="event.stopPropagation(); sendOneSlack(${i})">
+             💬 슬랙 전송
+           </button>` : ''}
            ${confirmed ? `<button class="btn-reset-confirm"
              onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">
              ↩ 확인 취소
@@ -1281,10 +1320,12 @@ function selectAllConfirmed() {
 }
 
 function updateBulkBtn() {
-  const btn  = document.getElementById('btn_pdf_bulk');
-  const hint = document.getElementById('admin-select-hint');
+  const btn      = document.getElementById('btn_pdf_bulk');
+  const slackBtn = document.getElementById('btn_slack_bulk');
+  const hint     = document.getElementById('admin-select-hint');
   if (!btn) return;
   btn.disabled = g_selected.size === 0;
+  if (slackBtn) slackBtn.disabled = g_selected.size === 0;
   hint.textContent = g_selected.size > 0
     ? `${g_selected.size}명 선택됨`
     : '이상없음 상태의 카드를 선택하세요';
@@ -1739,6 +1780,92 @@ async function handleTokenFileUpload(file) {
     infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">오류: ${e.message}</div>`;
   }
 }
+
+// ──────────────────────────────────────────────────────────
+// 슬랙 연동
+// ──────────────────────────────────────────────────────────
+function saveSlackToken() {
+  const val = document.getElementById('slack_token_input').value.trim();
+  if (!val) return;
+  localStorage.setItem('slack_token', val);
+  document.getElementById('slack_token_input').value = '';
+  document.getElementById('slack_token_status').textContent = '✅ 저장됨';
+  setTimeout(() => { document.getElementById('slack_token_status').textContent = ''; }, 2000);
+}
+
+function getSlackToken() {
+  return localStorage.getItem('slack_token') || '';
+}
+
+async function slackPostMessage(channel, text) {
+  const token = getSlackToken();
+  if (!token) { alert('슬랙 토큰을 먼저 설정해주세요.'); return false; }
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel, text }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || '전송 실패');
+  return true;
+}
+
+function makeSlackMessage(이름, month, year, token) {
+  const link = `${location.origin}${location.pathname}?token=${token}`;
+  return `@${이름} 님, 안녕하세요!\n${year}년 ${month}월 작업내역 확인 부탁드립니다 :)\n👉 ${link}`;
+}
+
+async function sendOneSlack(idx) {
+  const month = parseInt(document.getElementById('month').value);
+  const year  = parseInt(document.getElementById('year').value);
+  const r     = g_results[idx];
+  if (!r) return;
+  const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
+  const channel = r.info ? String(r.info['slack_channel'] || '').trim() : '';
+  const token   = g_tokens[confirmStateKey(r.sheetName, month)];
+  if (!channel) { alert('slack_channel 정보가 없습니다.'); return; }
+  if (!token)   { alert('링크 토큰이 없습니다. 불러오기를 먼저 실행해주세요.'); return; }
+  const btn = document.getElementById(`slackbtn_${idx}`);
+  if (btn) { btn.textContent = '전송 중...'; btn.disabled = true; }
+  try {
+    await slackPostMessage(channel, makeSlackMessage(이름, month, year, token));
+    if (btn) { btn.textContent = '✅ 전송완료'; btn.classList.add('sent'); }
+  } catch(e) {
+    alert(`${이름} 전송 실패: ${e.message}`);
+    if (btn) { btn.textContent = '💬 슬랙 전송'; btn.disabled = false; }
+  }
+}
+
+async function handleBulkSlack() {
+  const indices = [...g_selected];
+  if (!indices.length) return;
+  const month = parseInt(document.getElementById('month').value);
+  const year  = parseInt(document.getElementById('year').value);
+  const prog  = document.getElementById('pdf-progress');
+  let ok = 0, fail = 0;
+  for (const idx of indices) {
+    const r       = g_results[idx];
+    const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
+    const channel = r.info ? String(r.info['slack_channel'] || '').trim() : '';
+    const token   = g_tokens[confirmStateKey(r.sheetName, month)];
+    prog.textContent = `💬 ${이름} 전송 중...`;
+    if (!channel || !token) { fail++; continue; }
+    try {
+      await slackPostMessage(channel, makeSlackMessage(이름, month, year, token));
+      ok++;
+    } catch(e) { fail++; }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  prog.textContent = `✅ ${ok}명 전송 완료${fail ? ` / ❌ ${fail}명 실패` : ''}`;
+}
+
+// 페이지 로드 시 토큰 저장 여부 표시
+(function initSlackTokenUI() {
+  if (getSlackToken()) {
+    const s = document.getElementById('slack_token_status');
+    if (s) s.textContent = '✅ 토큰 저장됨';
+  }
+})();
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
