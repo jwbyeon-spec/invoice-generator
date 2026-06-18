@@ -1801,10 +1801,11 @@ function getSlackToken() {
 async function slackPostMessage(channel, text) {
   const token = getSlackToken();
   if (!token) { alert('슬랙 토큰을 먼저 설정해주세요.'); return false; }
+  const params = new URLSearchParams({ token, channel, text });
   const res = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel, text }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
   });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || '전송 실패');
