@@ -835,7 +835,10 @@ async function loadData() {
       // Supabase 토큰 동기화 + 확인 상태 반영
       const year = parseInt(document.getElementById('year').value);
       syncTokensToSupabase(year, month).then(() =>
-        loadConfirmStatesFromSupabase(year, month).then(() => renderDashboard(month))
+        loadConfirmStatesFromSupabase(year, month).then(() => {
+          renderDashboard(month);
+          startDashboardPolling();
+        })
       ).catch(e => console.error('Supabase 동기화 실패:', e));
     }
   } catch(e) {
@@ -1154,9 +1157,25 @@ async function onConfirmed(sheetName, month) {
 }
 
 function updateDashboardCard(sheetName) {
-  // 해당 카드만 재렌더링 (대시보드 전체 재렌더 대신)
   const month = parseInt(document.getElementById('month').value);
   renderDashboard(month);
+}
+
+// 관리자 대시보드 자동 폴링 (30초마다 Supabase에서 확인 상태만 갱신)
+let g_pollInterval = null;
+
+function startDashboardPolling() {
+  if (g_tokenMode) return; // 프리랜서 뷰에서는 폴링 안 함
+  if (g_pollInterval) clearInterval(g_pollInterval);
+  g_pollInterval = setInterval(async () => {
+    if (!g_results.length) return;
+    const month = parseInt(document.getElementById('month').value);
+    const year  = parseInt(document.getElementById('year').value);
+    try {
+      await loadConfirmStatesFromSupabase(year, month);
+      renderDashboard(month);
+    } catch(e) { /* 무시 */ }
+  }, 30000); // 30초
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1549,6 +1568,7 @@ function showTokenAlreadyConfirmed() {
       <div class="token-prompt-icon">✅</div>
       <p class="token-prompt-title">이미 제출 완료되었습니다</p>
       <p class="token-prompt-sub">제출일시: ${dt}</p>
+      <button class="token-upload-label" style="margin-top:16px;background:#64748b" onclick="renderTokenDetail()">작업내역 다시 보기</button>
     </div>`;
   document.getElementById('detail-table-wrap').style.display = 'none';
   document.getElementById('confirm-box').style.display = 'none';
