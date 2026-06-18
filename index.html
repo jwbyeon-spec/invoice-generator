@@ -184,6 +184,18 @@ body {
 .btn-pdf-bulk:hover { background: #6d28d9; }
 .btn-pdf-bulk:disabled { background: #4c1d95; opacity: .6; cursor: not-allowed; }
 .admin-select-hint { color: #64748b; font-size: 12px; margin-top: 4px; }
+.btn-select-all {
+  background: none; border: 1px solid #7c3aed; border-radius: 8px;
+  color: #a78bfa; font-size: 13px; font-weight: 600; padding: 8px 16px;
+  cursor: pointer; font-family: inherit; transition: background .2s, color .2s;
+}
+.btn-select-all:hover { background: #7c3aed; color: #fff; }
+.btn-clear-file {
+  background: none; border: 1px solid #475569; border-radius: 6px;
+  color: #94a3b8; font-size: 12px; padding: 5px 10px; cursor: pointer;
+  font-family: inherit; white-space: nowrap; transition: border-color .2s, color .2s;
+}
+.btn-clear-file:hover { border-color: #ef4444; color: #ef4444; }
 
 /* 카드 체크박스 (관리자) */
 .fl-card-checkbox {
@@ -375,6 +387,7 @@ body {
       <input type="file" accept=".xlsx,.xls" id="data_file">
       <span id="upload_label">📂 엑셀 파일 업로드</span>
     </div>
+    <button class="btn-clear-file" id="btn_clear_file" style="display:none" onclick="clearExcelFile()">✕ 파일 제거</button>
   </div>
   <div class="header-selects">
     <label>연도</label>
@@ -407,6 +420,7 @@ body {
     </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn-pdf-bulk" id="btn_pdf_bulk" disabled>📄 선택자 PDF 생성</button>
+      <button class="btn-select-all" id="btn_select_all" onclick="selectAllConfirmed()">☑ 전체 선택</button>
       <span class="admin-select-hint" id="admin-select-hint">이상없음 상태의 카드를 선택하세요</span>
     </div>
     <div class="pdf-progress" id="pdf-progress"></div>
@@ -588,11 +602,55 @@ initTokenMode();
 
 function handleFile(file) {
   if (!file) return;
-  const btn = document.getElementById('upload_btn');
-  document.getElementById('upload_label').textContent = '📄 ' + file.name;
-  btn.classList.add('has-file');
-  parseExcel(file).then(wb => { g_wb = wb; g_listInfo = loadListInfo(wb); });
+  const reader = new FileReader();
+  reader.onload = e => {
+    const ab = e.target.result;
+    try {
+      sessionStorage.setItem('excel_name', file.name);
+      sessionStorage.setItem('excel_data', btoa(String.fromCharCode(...new Uint8Array(ab))));
+    } catch(err) { console.warn('sessionStorage 저장 실패:', err); }
+    const wb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
+    g_wb = wb;
+    g_listInfo = loadListInfo(wb);
+    setFileLoaded(file.name);
+  };
+  reader.readAsArrayBuffer(file);
 }
+
+function setFileLoaded(name) {
+  document.getElementById('upload_label').textContent = '📄 ' + name;
+  document.getElementById('upload_btn').classList.add('has-file');
+  document.getElementById('btn_clear_file').style.display = '';
+}
+
+function clearExcelFile() {
+  sessionStorage.removeItem('excel_name');
+  sessionStorage.removeItem('excel_data');
+  g_wb = null; g_listInfo = {}; g_results = []; g_confirmState = {}; g_tokens = {};
+  document.getElementById('upload_label').textContent = '📂 엑셀 파일 업로드';
+  document.getElementById('upload_btn').classList.remove('has-file');
+  document.getElementById('btn_clear_file').style.display = 'none';
+  document.getElementById('fl-grid').innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">📂</div><p>엑셀 파일을 업로드하고 월을 선택한 뒤 <strong>불러오기</strong>를 클릭하세요</p></div>';
+  document.getElementById('summary-bar').style.display = 'none';
+  document.getElementById('dash-status').style.display = 'none';
+  if (g_pollInterval) { clearInterval(g_pollInterval); g_pollInterval = null; }
+}
+
+// 새로고침 후 sessionStorage에서 파일 복원
+(function restoreExcelFromSession() {
+  const name = sessionStorage.getItem('excel_name');
+  const data = sessionStorage.getItem('excel_data');
+  if (!name || !data) return;
+  try {
+    const binary = atob(data);
+    const ab = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) ab[i] = binary.charCodeAt(i);
+    const wb = XLSX.read(ab, { type: 'array', cellDates: false });
+    g_wb = wb;
+    g_listInfo = loadListInfo(wb);
+    setFileLoaded(name);
+  } catch(e) { console.warn('파일 복원 실패:', e); }
+})();
 
 document.getElementById('data_file').addEventListener('change', function() {
   handleFile(this.files[0]);
@@ -1205,6 +1263,17 @@ function toggleCardSelect(idx, chk) {
   updateBulkBtn();
 }
 
+function selectAllConfirmed() {
+  const month = parseInt(document.getElementById('month').value);
+  g_results.forEach((r, i) => {
+    const state = g_confirmState[confirmStateKey(r.sheetName, month)] || {};
+    const confirmed = state.status === 'confirmed' || state.status === 'pdf_generated';
+    if (!confirmed) return;
+    const chk = document.getElementById(`chk_${i}`);
+    if (chk && !chk.checked) { chk.checked = true; toggleCardSelect(i, chk); }
+  });
+}
+
 function updateBulkBtn() {
   const btn  = document.getElementById('btn_pdf_bulk');
   const hint = document.getElementById('admin-select-hint');
@@ -1575,7 +1644,19 @@ function renderTokenDetail() {
   const box = document.getElementById('confirm-box');
   const actionEl = document.getElementById('confirm-action');
   box.style.display = 'block';
-  actionEl.innerHTML = `<button class="btn-confirm" onclick="handleConfirm('${r.sheetName}', ${g_tokenData.month})">이상 없음</button>`;
+  if (g_tokenData.status === 'confirmed' || g_tokenData.status === 'pdf_generated') {
+    const dt = g_tokenData.confirmed_at ? new Date(g_tokenData.confirmed_at).toLocaleString('ko-KR') : '';
+    actionEl.innerHTML = `
+      <div class="confirm-done">
+        <span class="done-icon">✅</span>
+        <div>
+          <div class="done-text">이상 없음으로 제출되었습니다.</div>
+          <div class="done-time">제출일시: ${dt}</div>
+        </div>
+      </div>`;
+  } else {
+    actionEl.innerHTML = `<button class="btn-confirm" onclick="handleConfirm('${r.sheetName}', ${g_tokenData.month})">이상 없음</button>`;
+  }
 }
 
 function showTokenUploadPrompt() {
