@@ -1812,9 +1812,25 @@ async function slackPostMessage(channel, text) {
   return true;
 }
 
-function makeSlackMessage(이름, month, year, token) {
+async function lookupSlackUserId(emailsRaw) {
+  const token = getSlackToken();
+  if (!token || !emailsRaw) return null;
+  const emails = String(emailsRaw).split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
+  for (const email of emails) {
+    try {
+      const params = new URLSearchParams({ token, email });
+      const res = await fetch('https://slack.com/api/users.lookupByEmail?' + params.toString());
+      const data = await res.json();
+      if (data.ok && data.user && data.user.id) return data.user.id;
+    } catch(e) {}
+  }
+  return null;
+}
+
+function makeSlackMessage(이름, month, year, token, slackUserId) {
   const link = `${location.origin}${location.pathname}?token=${token}`;
-  return `@${이름} 님, 안녕하세요!\n${year}년 ${month}월 작업내역 확인 부탁드립니다 :)\n👉 ${link}`;
+  const mention = slackUserId ? `<@${slackUserId}>` : `@${이름}`;
+  return `${mention} 님, 안녕하세요!\n${year}년 ${month}월 작업내역 확인 부탁드립니다 :)\n👉 ${link}`;
 }
 
 async function sendOneSlack(idx) {
@@ -1830,7 +1846,9 @@ async function sendOneSlack(idx) {
   const btn = document.getElementById(`slackbtn_${idx}`);
   if (btn) { btn.textContent = '전송 중...'; btn.disabled = true; }
   try {
-    await slackPostMessage(channel, makeSlackMessage(이름, month, year, token));
+    const emails = r.info ? r.info['이메일'] : '';
+    const slackUserId = await lookupSlackUserId(emails);
+    await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
     if (btn) { btn.textContent = '✅ 전송완료'; btn.classList.add('sent'); }
   } catch(e) {
     alert(`${이름} 전송 실패: ${e.message}`);
@@ -1856,7 +1874,9 @@ async function handleBulkSlack() {
     if (!channel) { noChannel++; continue; }
     if (!token)   { fail++; continue; }
     try {
-      await slackPostMessage(channel, makeSlackMessage(이름, month, year, token));
+      const emails = r.info ? r.info['이메일'] : '';
+      const slackUserId = await lookupSlackUserId(emails);
+      await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
       ok++;
     } catch(e) { fail++; }
     await new Promise(r => setTimeout(r, 300));
