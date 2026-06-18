@@ -1823,7 +1823,11 @@ async function getSlackMembers() {
     do {
       const params = new URLSearchParams({ token, limit: 200 });
       if (cursor) params.set('cursor', cursor);
-      const res = await fetch('https://slack.com/api/users.list?' + params.toString());
+      const res = await fetch('https://slack.com/api/users.list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
       const data = await res.json();
       if (!data.ok) break;
       members.push(...(data.members || []));
