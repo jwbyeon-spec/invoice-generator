@@ -451,9 +451,12 @@ body {
       <div class="adf"><label>검수완료일</label><input type="date" id="a_date_inspect"></div>
       <div class="adf"><label>발행일</label><input type="date" id="a_date_issue"></div>
     </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn-slack-bulk" id="btn_slack_bulk" onclick="handleBulkSlack()">📢 전체 슬랙 전송</button>
+      <span style="font-size:12px;color:#64748b">불러오기 후 전원에게 확인 링크 전송</span>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn-pdf-bulk" id="btn_pdf_bulk" disabled>📄 선택자 PDF 생성</button>
-      <button class="btn-slack-bulk" id="btn_slack_bulk" disabled onclick="handleBulkSlack()">💬 선택자 슬랙 전송</button>
       <button class="btn-select-all" id="btn_select_all" onclick="selectAllConfirmed()">☑ 전체 선택</button>
       <span class="admin-select-hint" id="admin-select-hint">이상없음 상태의 카드를 선택하세요</span>
     </div>
@@ -1320,12 +1323,10 @@ function selectAllConfirmed() {
 }
 
 function updateBulkBtn() {
-  const btn      = document.getElementById('btn_pdf_bulk');
-  const slackBtn = document.getElementById('btn_slack_bulk');
-  const hint     = document.getElementById('admin-select-hint');
+  const btn  = document.getElementById('btn_pdf_bulk');
+  const hint = document.getElementById('admin-select-hint');
   if (!btn) return;
   btn.disabled = g_selected.size === 0;
-  if (slackBtn) slackBtn.disabled = g_selected.size === 0;
   hint.textContent = g_selected.size > 0
     ? `${g_selected.size}명 선택됨`
     : '이상없음 상태의 카드를 선택하세요';
@@ -1837,26 +1838,30 @@ async function sendOneSlack(idx) {
 }
 
 async function handleBulkSlack() {
-  const indices = [...g_selected];
-  if (!indices.length) return;
+  if (!g_results.length) { alert('먼저 불러오기를 실행해주세요.'); return; }
+  if (!confirm(`${g_results.length}명 전원에게 슬랙 메시지를 전송하시겠습니까?`)) return;
   const month = parseInt(document.getElementById('month').value);
   const year  = parseInt(document.getElementById('year').value);
   const prog  = document.getElementById('pdf-progress');
-  let ok = 0, fail = 0;
-  for (const idx of indices) {
+  const btn   = document.getElementById('btn_slack_bulk');
+  btn.disabled = true;
+  let ok = 0, fail = 0, noChannel = 0;
+  for (let idx = 0; idx < g_results.length; idx++) {
     const r       = g_results[idx];
     const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
     const channel = r.info ? String(r.info['slack_channel'] || '').trim() : '';
     const token   = g_tokens[confirmStateKey(r.sheetName, month)];
-    prog.textContent = `💬 ${이름} 전송 중...`;
-    if (!channel || !token) { fail++; continue; }
+    prog.textContent = `💬 (${idx+1}/${g_results.length}) ${이름} 전송 중...`;
+    if (!channel) { noChannel++; continue; }
+    if (!token)   { fail++; continue; }
     try {
       await slackPostMessage(channel, makeSlackMessage(이름, month, year, token));
       ok++;
     } catch(e) { fail++; }
     await new Promise(r => setTimeout(r, 300));
   }
-  prog.textContent = `✅ ${ok}명 전송 완료${fail ? ` / ❌ ${fail}명 실패` : ''}`;
+  btn.disabled = false;
+  prog.textContent = `✅ ${ok}명 전송 완료${fail ? ` / ❌ ${fail}명 실패` : ''}${noChannel ? ` / ⚠️ ${noChannel}명 채널 없음` : ''}`;
 }
 
 // 페이지 로드 시 토큰 저장 여부 표시
