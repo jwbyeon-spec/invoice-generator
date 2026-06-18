@@ -1445,7 +1445,8 @@ function renderTokenDetail() {
   document.getElementById('month').value = g_tokenData.month;
   renderDetailSelect();
   document.getElementById('detail-select').value = 0;
-  document.getElementById('detail-info').style.display = 'none';
+  // renderDetail()이 detail-info-grid를 사용하므로 원래 구조 복원
+  document.getElementById('detail-info').innerHTML = '<div class="info-grid" id="detail-info-grid"></div>';
   renderDetail();
 }
 
