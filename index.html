@@ -1039,7 +1039,7 @@ function renderDashboard(month) {
     }
 
     const token = g_tokens[key];
-    const slackCh = r.info ? String(r.info['slack_channel'] || '').trim() : '';
+    const slackCh = r.info ? String(r.info['슬랙 채널'] || '').trim() : '';
     const copyLinkHtml = token
       ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
            <button class="btn-copy-link" id="cpbtn_${i}"
@@ -1822,7 +1822,7 @@ async function sendOneSlack(idx) {
   const r     = g_results[idx];
   if (!r) return;
   const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
-  const channel = r.info ? String(r.info['slack_channel'] || '').trim() : '';
+  const channel = r.info ? String(r.info['슬랙 채널'] || '').trim() : '';
   const token   = g_tokens[confirmStateKey(r.sheetName, month)];
   if (!channel) { alert('slack_channel 정보가 없습니다.'); return; }
   if (!token)   { alert('링크 토큰이 없습니다. 불러오기를 먼저 실행해주세요.'); return; }
@@ -1849,7 +1849,7 @@ async function handleBulkSlack() {
   for (let idx = 0; idx < g_results.length; idx++) {
     const r       = g_results[idx];
     const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
-    const channel = r.info ? String(r.info['slack_channel'] || '').trim() : '';
+    const channel = r.info ? String(r.info['슬랙 채널'] || '').trim() : '';
     const token   = g_tokens[confirmStateKey(r.sheetName, month)];
     prog.textContent = `💬 (${idx+1}/${g_results.length}) ${이름} 전송 중...`;
     if (!channel) { noChannel++; continue; }
