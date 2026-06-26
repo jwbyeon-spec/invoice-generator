@@ -638,7 +638,7 @@ body {
     <hr class="section-divider">
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#cbd5e1;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer">
         <input type="checkbox" id="req_all_check" onchange="renderRequestList()"> 전체 발송
       </label>
       <span style="font-size:12px;color:#64748b">체크 해제 시 아래에서 개별 선택</span>
@@ -650,6 +650,21 @@ body {
 
     <button class="btn-invoice" id="btn_request_send" onclick="handleRequestSend()">📨 번역 요청 발송</button>
     <div class="inv-status" id="request-status"></div>
+  </div>
+
+  <!-- 요청 현황 보드 -->
+  <div class="invoice-card" style="max-width:980px;margin-top:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+      <h2 style="margin:0">요청 현황</h2>
+      <button onclick="loadRequestBoard()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
+    </div>
+    <p class="sub" id="req_board_summary" style="margin-bottom:14px">⏳ 대기 0 · ✅ 수락 0 · 🎉 완료 0</p>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;margin-bottom:14px">
+      <input type="checkbox" id="req_board_all" onchange="loadRequestBoard()"> 전체 보기 <span style="color:#94a3b8">(체크 해제 시 이번 달만)</span>
+    </label>
+    <div id="request_board" style="overflow-x:auto">
+      <div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 현황을 불러오세요</div>
+    </div>
   </div>
 </div>
 
@@ -846,7 +861,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     this.classList.add('active');
     document.getElementById('view-' + this.dataset.tab).classList.add('active');
     if (this.dataset.tab === 'broadcast') renderBroadcastList();
-    if (this.dataset.tab === 'request') renderRequestList();
+    if (this.dataset.tab === 'request') { renderRequestList(); loadRequestBoard(); }
   });
 });
 
@@ -2170,6 +2185,65 @@ async function handleRequestSend() {
   }
   btn.disabled = false;
   status.textContent = `✅ ${ok}명 발송 완료${fail ? ` / ❌ ${fail}명 실패` : ''}`;
+  loadRequestBoard();   // 발송 직후 현황 갱신
+}
+
+// ── 요청 현황 보드 ──
+async function loadRequestBoard() {
+  const wrap = document.getElementById('request_board');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="empty-state" style="padding:20px">불러오는 중...</div>';
+  try {
+    const showAll = document.getElementById('req_board_all').checked;
+    let path = 'translation_requests?order=created_at.desc';
+    if (!showAll) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const end   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      path += `&created_at=gte.${start}&created_at=lt.${end}`;
+    }
+    const rows = await supaFetch(path, 'GET');
+    renderRequestBoard(rows);
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state" style="padding:20px;color:#ef4444">불러오기 실패: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderRequestBoard(rows) {
+  const wrap = document.getElementById('request_board');
+  const summary = document.getElementById('req_board_summary');
+  if (!Array.isArray(rows) || !rows.length) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:20px">표시할 요청이 없습니다</div>';
+    summary.textContent = '⏳ 대기 0 · ✅ 수락 0 · 🎉 완료 0';
+    return;
+  }
+  const cnt = { sent: 0, accepted: 0, done: 0 };
+  rows.forEach(r => { if (cnt[r.status] !== undefined) cnt[r.status]++; });
+  summary.textContent = `⏳ 대기 ${cnt.sent} · ✅ 수락 ${cnt.accepted} · 🎉 완료 ${cnt.done}`;
+
+  const badge = s => s === 'done' ? '<span style="color:#16a34a;font-weight:700">🎉 완료</span>'
+    : s === 'accepted' ? '<span style="color:#2563eb;font-weight:700">✅ 수락</span>'
+    : '<span style="color:#94a3b8;font-weight:700">⏳ 대기중</span>';
+  const dDate = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 6 ? `${d.slice(2,4)}.${d.slice(4,6)}` : (d || '-'); };
+  const sentAt = ts => { if (!ts) return '-'; const t = new Date(ts); return `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; };
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="border-bottom:2px solid #e0e6ef;color:#64748b;text-align:left">
+      <th style="padding:9px 8px">프리랜서</th><th style="padding:9px 8px">게임</th><th style="padding:9px 8px">품명</th>
+      <th style="padding:9px 8px">마감</th><th style="padding:9px 8px">상태</th><th style="padding:9px 8px">보낸시각</th>
+    </tr></thead><tbody>`;
+  for (const r of rows) {
+    html += `<tr style="border-bottom:1px solid #f0f0f0;color:#1e293b">
+      <td style="padding:9px 8px;font-weight:600">${esc(r.freelancer_name)}</td>
+      <td style="padding:9px 8px">${esc(r.game || '-')}</td>
+      <td style="padding:9px 8px">${esc(r.item || '-')}</td>
+      <td style="padding:9px 8px">${dDate(r.deadline)}</td>
+      <td style="padding:9px 8px">${badge(r.status)}</td>
+      <td style="padding:9px 8px;color:#94a3b8">${sentAt(r.created_at)}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
 }
 
 async function sendOneSlack(idx) {
