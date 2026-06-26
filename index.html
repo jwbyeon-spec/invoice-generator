@@ -557,13 +557,13 @@ body {
     </div>
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#cbd5e1;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer">
         <input type="checkbox" id="broadcast_all_check" onchange="toggleBroadcastAll()"> 전체 발송
       </label>
       <span style="font-size:12px;color:#64748b">체크 해제 시 아래에서 개별 선택</span>
     </div>
 
-    <div id="broadcast_list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:16px">
+    <div id="broadcast_list" style="display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;border:1.5px solid #e0e6ef;border-radius:8px;padding:10px;margin-bottom:16px">
       <div class="empty-state" style="padding:20px">엑셀 파일을 업로드하면 프리랜서 목록이 표시됩니다</div>
     </div>
 
@@ -654,7 +654,7 @@ body {
   </div>
 
   <!-- 요청 현황 보드 -->
-  <div class="invoice-card" style="flex:1;min-width:440px">
+  <div class="invoice-card" style="flex:1;min-width:440px;max-width:820px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
       <h2 style="margin:0">요청 현황</h2>
       <button onclick="loadRequestBoard()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
@@ -2026,9 +2026,9 @@ function renderBroadcastList() {
     const 이름 = info['이름'] || info['영문 이름'] || `(이름없음 ${i})`;
     const channel = String(info['슬랙 채널'] || '').trim();
     const noChannel = !channel;
-    return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:${noChannel ? '#64748b' : '#cbd5e1'};cursor:${noChannel ? 'not-allowed' : 'pointer'}">
-      <input type="checkbox" class="bc-check" data-idx="${i}" ${allChecked ? 'checked' : ''} ${noChannel ? 'disabled' : ''}>
-      ${이름}${noChannel ? ' (슬랙 채널 없음)' : ''}
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:${noChannel ? '#94a3b8' : '#1e293b'};cursor:${noChannel ? 'not-allowed' : 'pointer'};padding:3px 2px">
+      <input type="checkbox" class="bc-check" data-idx="${i}" ${allChecked ? 'checked' : ''} ${noChannel ? 'disabled' : ''} style="width:15px;height:15px;cursor:${noChannel ? 'not-allowed' : 'pointer'}">
+      ${esc(이름)}${noChannel ? ' <span style="color:#ef4444;font-weight:400">(슬랙 채널 없음)</span>' : ''}
     </label>`;
   }).join('');
   g_broadcastList = list;
