@@ -1605,6 +1605,16 @@ async function regenPdf(idx) {
 // ──────────────────────────────────────────────────────────
 // Supabase 토큰 동기화 / 상태 로드
 // ──────────────────────────────────────────────────────────
+// 클라우드(Supabase)에는 민감정보(주민번호·계좌·연락처·주소)를 저장하지 않음
+function safeInfo(info) {
+  if (!info) return null;
+  return {
+    '이름': info['이름'] || '',
+    '영문 이름': info['영문 이름'] || '',
+    '이메일': info['이메일'] || '',
+  };
+}
+
 async function syncTokensToSupabase(year, month) {
   const rows = g_results.map(r => ({
     sheet_name: r.sheetName,
@@ -1617,7 +1627,7 @@ async function syncTokensToSupabase(year, month) {
       agg: r.agg,
       usd: r.usd,
       소계: r.소계,
-      info: r.info || null,
+      info: safeInfo(r.info),
     },
   }));
   if (!rows.length) return;
@@ -1667,7 +1677,7 @@ async function resetConfirm(sheetName, month, cardIdx) {
         pdf_generated_at: null,
         rows_json: r ? {
           sheetMeta: r.sheetMeta, rows: r.rows, agg: r.agg,
-          usd: r.usd, 소계: r.소계, info: r.info || null,
+          usd: r.usd, 소계: r.소계, info: safeInfo(r.info),
         } : undefined,
       }
     );
@@ -1752,8 +1762,6 @@ function renderTokenDetail() {
     ['이름', info['이름'] || r.sheetMeta.영문명],
     ['영문명', info['영문 이름'] || r.sheetMeta.영문명],
     ['이메일', info['이메일'] || '-'],
-    ['연락처', info['연락처'] || '-'],
-    ['계좌정보', info['계좌정보'] || '-'],
     ['언어', r.sheetMeta.언어],
     ['통화', r.usd ? 'USD' : 'KRW'],
   ];
