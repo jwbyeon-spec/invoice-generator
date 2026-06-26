@@ -426,6 +426,7 @@ body {
   <div class="tab active" data-tab="dashboard">대시보드</div>
   <div class="tab" data-tab="detail">상세 내역</div>
   <div class="tab" data-tab="invoice">거래명세서 생성</div>
+  <div class="tab" data-tab="broadcast">전체 메세지 발송</div>
 </div>
 
 <!-- ── 대시보드 뷰 ── -->
@@ -537,6 +538,36 @@ body {
 
     <button class="btn-invoice" id="btn_print">🖨️ 미리보기 / PDF 저장</button>
     <div class="inv-status" id="inv-status"></div>
+  </div>
+</div>
+
+<!-- ── 전체 메세지 발송 뷰 ── -->
+<div class="view" id="view-broadcast">
+  <div class="invoice-card">
+    <h2>전체 메세지 발송</h2>
+    <p class="sub">엑셀에 등록된 프리랜서에게 자유 메세지를 슬랙으로 보냅니다 (각자 자동 태그됨)</p>
+
+    <hr class="section-divider">
+
+    <div class="field" style="margin-bottom:14px">
+      <label>메세지 내용</label>
+      <textarea id="broadcast_text" rows="5" placeholder="보낼 메세지를 입력하세요. 받는 사람 태그는 자동으로 앞에 붙습니다."
+        style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:10px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#cbd5e1;cursor:pointer">
+        <input type="checkbox" id="broadcast_all_check" onchange="toggleBroadcastAll()"> 전체 발송
+      </label>
+      <span style="font-size:12px;color:#64748b">체크 해제 시 아래에서 개별 선택</span>
+    </div>
+
+    <div id="broadcast_list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:16px">
+      <div class="empty-state" style="padding:20px">엑셀 파일을 업로드하면 프리랜서 목록이 표시됩니다</div>
+    </div>
+
+    <button class="btn-invoice" id="btn_broadcast_send" onclick="handleBroadcastSend()">📢 메세지 발송</button>
+    <div class="inv-status" id="broadcast-status"></div>
   </div>
 </div>
 
@@ -732,6 +763,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     this.classList.add('active');
     document.getElementById('view-' + this.dataset.tab).classList.add('active');
+    if (this.dataset.tab === 'broadcast') renderBroadcastList();
   });
 });
 
@@ -1865,6 +1897,71 @@ function makeSlackMessage(이름, month, year, token, slackUserId) {
   const link = `${location.origin}${location.pathname}?token=${token}`;
   const mention = slackUserId ? `<@${slackUserId}>` : `@${이름}`;
   return `${mention} 님, 안녕하세요!\n${year}년 ${month}월 작업내역 확인 부탁드립니다 :)\n👉 ${link}`;
+}
+
+// ──────────────────────────────────────────────────────────
+// 전체 메세지 발송 (거래명세서 데이터와 무관, List 시트만 사용)
+// ──────────────────────────────────────────────────────────
+function getUniqueFreelancers() {
+  return [...new Set(Object.values(g_listInfo))];
+}
+
+function renderBroadcastList() {
+  const wrap = document.getElementById('broadcast_list');
+  const list = getUniqueFreelancers();
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:20px">엑셀 파일을 업로드하면 프리랜서 목록이 표시됩니다</div>';
+    return;
+  }
+  const allChecked = document.getElementById('broadcast_all_check').checked;
+  wrap.innerHTML = list.map((info, i) => {
+    const 이름 = info['이름'] || info['영문 이름'] || `(이름없음 ${i})`;
+    const channel = String(info['슬랙 채널'] || '').trim();
+    const noChannel = !channel;
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:${noChannel ? '#64748b' : '#cbd5e1'};cursor:${noChannel ? 'not-allowed' : 'pointer'}">
+      <input type="checkbox" class="bc-check" data-idx="${i}" ${allChecked ? 'checked' : ''} ${noChannel ? 'disabled' : ''}>
+      ${이름}${noChannel ? ' (슬랙 채널 없음)' : ''}
+    </label>`;
+  }).join('');
+  g_broadcastList = list;
+}
+
+let g_broadcastList = [];
+
+function toggleBroadcastAll() {
+  renderBroadcastList();
+}
+
+async function handleBroadcastSend() {
+  const text = document.getElementById('broadcast_text').value.trim();
+  if (!text) { alert('메세지 내용을 입력해주세요.'); return; }
+  const checks = [...document.querySelectorAll('.bc-check:checked')];
+  if (!checks.length) { alert('보낼 대상을 선택해주세요.'); return; }
+  const targets = checks.map(c => g_broadcastList[parseInt(c.dataset.idx)]);
+  if (!confirm(`${targets.length}명에게 메세지를 전송하시겠습니까?`)) return;
+
+  const status = document.getElementById('broadcast-status');
+  const btn = document.getElementById('btn_broadcast_send');
+  btn.disabled = true;
+  let ok = 0, fail = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const info = targets[i];
+    const 이름 = info['이름'] || info['영문 이름'] || '';
+    const 영문명 = info['영문 이름'] || '';
+    const channel = String(info['슬랙 채널'] || '').trim();
+    const emails = info['이메일'] || '';
+    status.textContent = `💬 (${i+1}/${targets.length}) ${이름} 전송 중...`;
+    try {
+      const slackId = String(info['슬랙 ID'] || '').trim();
+      const slackUserId = slackId || await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
+      const mention = slackUserId ? `<@${slackUserId}>` : `@${이름}`;
+      await slackPostMessage(channel, `${mention} 님,\n${text}`);
+      ok++;
+    } catch(e) { fail++; }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  btn.disabled = false;
+  status.textContent = `✅ ${ok}명 전송 완료${fail ? ` / ❌ ${fail}명 실패` : ''}`;
 }
 
 async function sendOneSlack(idx) {
