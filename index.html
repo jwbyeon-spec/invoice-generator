@@ -584,12 +584,12 @@ body {
       <div class="field">
         <label>게임명</label>
         <input type="text" id="req_game" placeholder="예: 포트리스사가"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
       <div class="field">
         <label>품명</label>
         <select id="req_item"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
           <option value="번역(new)">번역(new)</option>
           <option value="검수">검수</option>
           <option value="LQA">LQA</option>
@@ -601,12 +601,12 @@ body {
       <div class="field">
         <label>번역 마감일 (YYMMDD)</label>
         <input type="text" id="req_deadline" placeholder="예: 260617" maxlength="6"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
       <div class="field">
         <label>마감 시간 (시) <span style="color:#64748b;font-weight:400">선택</span></label>
         <input type="text" id="req_deadline_time" placeholder="예: 18"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
     </div>
 
@@ -614,25 +614,25 @@ body {
       <div class="field">
         <label>신규 단어수 <span style="color:#64748b;font-weight:400">LQA는 비움</span></label>
         <input type="text" id="req_new_words" placeholder="예: 2891"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
       <div class="field">
         <label>중복 단어수 <span style="color:#64748b;font-weight:400">선택</span></label>
         <input type="text" id="req_rep_words" placeholder="예: 11"
-          style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
     </div>
 
     <div class="field" style="margin-bottom:14px">
       <label>작업 시트 링크 <span style="color:#64748b;font-weight:400">(완성물 칸에 기입됨)</span></label>
       <input type="text" id="req_work_sheet" placeholder="https://docs.google.com/..."
-        style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 10px;outline:none;font-family:inherit;box-sizing:border-box">
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
     </div>
 
     <div class="field" style="margin-bottom:14px">
       <label>특이사항 <span style="color:#64748b;font-weight:400">선택 — 메시지에만 표시</span></label>
       <textarea id="req_note" rows="2" placeholder="프리랜서에게 전달할 추가 안내"
-        style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;padding:10px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
     </div>
 
     <hr class="section-divider">
@@ -644,7 +644,7 @@ body {
       <span style="font-size:12px;color:#64748b">체크 해제 시 아래에서 개별 선택</span>
     </div>
 
-    <div id="request_list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:16px">
+    <div id="request_list" style="display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto;border:1.5px solid #e0e6ef;border-radius:8px;padding:10px;margin-bottom:16px">
       <div class="empty-state" style="padding:20px">엑셀 파일을 업로드하면 프리랜서 목록이 표시됩니다</div>
     </div>
 
@@ -2076,9 +2076,9 @@ function renderRequestList() {
     const channel = String(f.info['슬랙 채널'] || '').trim();
     const noChannel = !channel;
     const lang = f.info['언어'] || SHEET_TO_INFO[f.tabName]?.언어 || '';
-    return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:${noChannel ? '#64748b' : '#cbd5e1'};cursor:${noChannel ? 'not-allowed' : 'pointer'}">
-      <input type="checkbox" class="req-check" data-idx="${i}" ${allChecked ? 'checked' : ''} ${noChannel ? 'disabled' : ''}>
-      ${esc(f.이름)} <span style="color:#64748b">${esc(lang)}</span>${noChannel ? ' (슬랙 채널 없음)' : ''}
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:${noChannel ? '#94a3b8' : '#1e293b'};cursor:${noChannel ? 'not-allowed' : 'pointer'};padding:3px 2px">
+      <input type="checkbox" class="req-check" data-idx="${i}" ${allChecked ? 'checked' : ''} ${noChannel ? 'disabled' : ''} style="width:15px;height:15px;cursor:${noChannel ? 'not-allowed' : 'pointer'}">
+      ${esc(f.이름)} <span style="color:#94a3b8;font-weight:400;font-size:12px">${esc(lang)}</span>${noChannel ? ' <span style="color:#ef4444;font-weight:400">(슬랙 채널 없음)</span>' : ''}
     </label>`;
   }).join('');
   g_requestList = list;
