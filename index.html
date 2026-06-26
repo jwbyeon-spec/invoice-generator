@@ -574,6 +574,7 @@ body {
 
 <!-- ── 번역 요청 뷰 ── -->
 <div class="view" id="view-request">
+  <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
   <div class="invoice-card">
     <h2>번역 요청</h2>
     <p class="sub">프리랜서에게 작업 요청을 보냅니다. ✅ 누르면 관리시트에 자동 기록, 🎉 누르면 완료 알림이 옵니다.</p>
@@ -653,7 +654,7 @@ body {
   </div>
 
   <!-- 요청 현황 보드 -->
-  <div class="invoice-card" style="max-width:980px;margin-top:18px">
+  <div class="invoice-card" style="flex:1;min-width:440px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
       <h2 style="margin:0">요청 현황</h2>
       <button onclick="loadRequestBoard()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
@@ -665,6 +666,7 @@ body {
     <div id="request_board" style="overflow-x:auto">
       <div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 현황을 불러오세요</div>
     </div>
+  </div>
   </div>
 </div>
 
