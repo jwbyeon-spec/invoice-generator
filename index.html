@@ -1880,9 +1880,13 @@ async function sendOneSlack(idx) {
   const btn = document.getElementById(`slackbtn_${idx}`);
   if (btn) { btn.textContent = '전송 중...'; btn.disabled = true; }
   try {
-    const emails = r.info ? r.info['이메일'] : '';
-    const 영문명 = r.info ? r.info['영문 이름'] : '';
-    const slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
+    const slackId = r.info ? String(r.info['슬랙 ID'] || '').trim() : '';
+    let slackUserId = slackId || null;
+    if (!slackUserId) {
+      const emails = r.info ? r.info['이메일'] : '';
+      const 영문명 = r.info ? r.info['영문 이름'] : '';
+      slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
+    }
     await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
     if (btn) { btn.textContent = '✅ 전송완료'; btn.classList.add('sent'); }
   } catch(e) {
@@ -1909,9 +1913,13 @@ async function handleBulkSlack() {
     if (!channel) { noChannel++; continue; }
     if (!token)   { fail++; continue; }
     try {
-      const emails = r.info ? r.info['이메일'] : '';
-      const 영문명 = r.info ? r.info['영문 이름'] : '';
-      const slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
+      const slackId = r.info ? String(r.info['슬랙 ID'] || '').trim() : '';
+      let slackUserId = slackId || null;
+      if (!slackUserId) {
+        const emails = r.info ? r.info['이메일'] : '';
+        const 영문명 = r.info ? r.info['영문 이름'] : '';
+        slackUserId = await lookupSlackUserId(emails, [이름, 영문명].filter(Boolean));
+      }
       await slackPostMessage(channel, makeSlackMessage(이름, month, year, token, slackUserId));
       ok++;
     } catch(e) { fail++; }
