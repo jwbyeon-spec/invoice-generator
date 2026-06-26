@@ -2094,15 +2094,20 @@ function makeRequestMessage(slackUserId, 이름, fields) {
   const mention = slackUserId ? `<@${slackUserId}>` : `@${이름}`;
   const d = String(fields.deadline || '').replace(/\D/g, '');
   const dStr = d.length === 6 ? `20${d.slice(0,2)}.${d.slice(2,4)}.${d.slice(4,6)}` : fields.deadline;
-  let msg = `${mention} 님, 안녕하세요!\n아래 작업 요청드립니다 :)\n\n`;
-  msg += `• 게임명: ${fields.game}\n`;
-  msg += `• 품명: ${fields.item}\n`;
-  msg += `• 마감일: ${dStr}${fields.deadline_time ? ` ${fields.deadline_time}시` : ''}\n`;
-  if (fields.new_words) msg += `• 신규 단어수: ${fields.new_words}\n`;
-  if (fields.rep_words) msg += `• 중복 단어수: ${fields.rep_words}\n`;
-  if (fields.work_sheet) msg += `• 작업 시트: ${fields.work_sheet}\n`;
-  if (fields.note) msg += `• 특이사항: ${fields.note}\n`;
-  msg += `\n👉 작업 가능하시면 ✅ 를 눌러주세요.\n👉 작업 완료하시면 🎉 를 눌러주세요.`;
+  const dFull = `${dStr}${fields.deadline_time ? ` ${fields.deadline_time}시` : ''}`;
+
+  let msg = `${mention} 님, 안녕하세요! 👋\n`;
+  msg += `📢 *새 번역 작업을 요청드립니다.*\n\n`;
+  msg += `🎮 *게임명* ${fields.game}\n`;
+  msg += `📑 *품명* ${fields.item}\n`;
+  msg += `⏰ *마감일* *${dFull}*\n`;
+  if (fields.new_words) msg += `🆕 *신규 단어수* ${fields.new_words}\n`;
+  if (fields.rep_words) msg += `🔁 *중복 단어수* ${fields.rep_words}\n`;
+  if (fields.work_sheet) msg += `📄 *작업 시트* ${fields.work_sheet}\n`;
+  if (fields.note) msg += `\n📌 *특이사항*\n${fields.note}\n`;
+  msg += `\n━━━━━━━━━━━━━━━\n`;
+  msg += `✅ 작업 *가능*하시면 → 이 메시지에 *✅* 클릭\n`;
+  msg += `🎉 작업 *완료*하시면 → 끝나고 *🎉* 클릭`;
   return msg;
 }
 
