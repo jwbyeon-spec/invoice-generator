@@ -1634,7 +1634,7 @@ async function syncTokensToSupabase(year, month) {
   }));
   if (!rows.length) return;
   const result = await supaFetch(
-    'freelancer_tokens?on_conflict=sheet_name,month,year',
+    'freelancer_tokens?on_conflict=sheet_name,month,year&select=token,sheet_name',
     'POST',
     rows,
     'resolution=merge-duplicates,return=representation'
@@ -1648,7 +1648,7 @@ async function syncTokensToSupabase(year, month) {
 
 async function loadConfirmStatesFromSupabase(year, month) {
   const rows = await supaFetch(
-    `freelancer_tokens?month=eq.${month}&year=eq.${year}&select=*`
+    `freelancer_tokens?month=eq.${month}&year=eq.${year}&select=token,sheet_name,status,confirmed_at,pdf_generated_at`
   );
   if (!rows) return;
   for (const row of rows) {
@@ -1731,7 +1731,14 @@ async function initTokenMode() {
   infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#64748b">링크 확인 중...</div>`;
 
   try {
-    const rows = await supaFetch(`freelancer_tokens?token=eq.${encodeURIComponent(token)}&select=*`);
+    let rows;
+    try {
+      // 본인 토큰 전용 함수로만 전체 내역(rows_json)을 받음
+      rows = await supaFetch('rpc/get_token_data', 'POST', { p_token: token });
+    } catch(e) {
+      // 함수 적용 전(전환기) 폴백
+      rows = await supaFetch(`freelancer_tokens?token=eq.${encodeURIComponent(token)}&select=*`);
+    }
     if (!rows || !rows.length) {
       infoEl.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444">유효하지 않은 링크입니다.</div>`;
       return;
