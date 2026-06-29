@@ -1,0 +1,17 @@
+# 민감 데이터 파일 (주민번호·계좌 포함 — 절대 커밋 금지)
+*.xlsx
+*.xls
+*.csv
+
+# 환경변수/비밀
+.env
+.env.*
+*.local
+
+# 임시/스크래치
+_*.py
+*.tmp
+
+# OS/에디터
+.DS_Store
+Thumbs.db

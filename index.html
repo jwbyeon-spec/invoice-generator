@@ -735,6 +735,7 @@ async function supaFetch(path, method = 'GET', body = null, prefer = '') {
 // 전역 상태
 // ──────────────────────────────────────────────────────────
 let g_wb        = null;
+let g_fromCache = false; // 캐시(민감정보 제외)에서 복원됐는지 — 거래명세서 생성 가드용
 let g_listInfo  = {};
 let g_results   = [];   // 현재 월 집계 결과
 // key: "sheetName_월" → { status: 'confirmed', confirmedAt: ISO string }
@@ -767,14 +768,32 @@ document.getElementById('year').addEventListener('change', setDefaultDates);
 // 토큰 모드 초기화 (프리랜서 전용 뷰)
 initTokenMode();
 
+// List 시트에서 민감정보 컬럼 제거 (브라우저 캐시 저장용)
+function stripSensitiveSheet(wb) {
+  if (!wb.Sheets || !wb.Sheets['List']) return;
+  const SENS = ['주민등록번호', '여권번호', '계좌정보', '연락처', '주소'];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets['List'], { defval: '' });
+  rows.forEach(r => SENS.forEach(k => { delete r[k]; }));
+  wb.Sheets['List'] = XLSX.utils.json_to_sheet(rows);
+}
+
 function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
     const ab = e.target.result;
+    // 세션 메모리엔 전체(주민번호·주소 포함) — 거래명세서 생성에 필요
+    const wb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
+    g_wb = wb;
+    g_fromCache = false;
+    g_listInfo = loadListInfo(wb);
+    setFileLoaded(file.name);
+    // 브라우저 캐시엔 민감정보 제거본만 저장
     try {
-      // 청크 단위로 base64 인코딩 (대용량 파일 스택 오버플로우 방지)
-      const bytes = new Uint8Array(ab);
+      const safeWb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
+      stripSensitiveSheet(safeWb);
+      const out = XLSX.write(safeWb, { type: 'array', bookType: 'xlsx' });
+      const bytes = new Uint8Array(out);
       let binary = '';
       for (let i = 0; i < bytes.length; i += 8192) {
         binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
@@ -782,10 +801,6 @@ function handleFile(file) {
       localStorage.setItem('excel_name', file.name);
       localStorage.setItem('excel_data', btoa(binary));
     } catch(err) { console.warn('localStorage 저장 실패:', err); }
-    const wb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
-    g_wb = wb;
-    g_listInfo = loadListInfo(wb);
-    setFileLoaded(file.name);
   };
   reader.readAsArrayBuffer(file);
 }
@@ -799,7 +814,7 @@ function setFileLoaded(name) {
 function clearExcelFile() {
   localStorage.removeItem('excel_name');
   localStorage.removeItem('excel_data');
-  g_wb = null; g_listInfo = {}; g_results = []; g_confirmState = {}; g_tokens = {};
+  g_wb = null; g_fromCache = false; g_listInfo = {}; g_results = []; g_confirmState = {}; g_tokens = {};
   document.getElementById('upload_label').textContent = '📂 엑셀 파일 업로드';
   document.getElementById('upload_btn').classList.remove('has-file');
   document.getElementById('btn_clear_file').style.display = 'none';
@@ -820,6 +835,7 @@ function clearExcelFile() {
     for (let i = 0; i < binary.length; i++) ab[i] = binary.charCodeAt(i);
     const wb = XLSX.read(ab, { type: 'array', cellDates: false });
     g_wb = wb;
+    g_fromCache = true;   // 캐시엔 주민번호·주소가 없음 → 거래명세서 생성 시 재업로드 필요
     g_listInfo = loadListInfo(wb);
     setFileLoaded(name);
   } catch(e) { console.warn('파일 복원 실패:', e); }
@@ -1512,6 +1528,7 @@ document.getElementById('btn_pdf_bulk')?.addEventListener('click', handleBulkPdf
 async function handleBulkPdf() {
   const indices = [...g_selected];
   if (!indices.length) return;
+  if (g_fromCache) { alert('보안을 위해 민감정보(주민번호·주소)는 브라우저에 저장하지 않습니다.\n거래명세서를 생성하려면 엑셀 파일을 다시 업로드해주세요.'); return; }
 
   const btn  = document.getElementById('btn_pdf_bulk');
   const prog = document.getElementById('pdf-progress');
@@ -1565,6 +1582,7 @@ async function handleBulkPdf() {
 
 // 개별 재생성
 async function regenPdf(idx) {
+  if (g_fromCache) { alert('보안을 위해 민감정보(주민번호·주소)는 브라우저에 저장하지 않습니다.\n거래명세서를 생성하려면 엑셀 파일을 다시 업로드해주세요.'); return; }
   const month = parseInt(document.getElementById('month').value);
   const year  = parseInt(document.getElementById('year').value);
   const dates = getAdminDates();
@@ -2485,6 +2503,7 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
 async function generateInvoice() {
   if (!g_wb) { setInvStatus('error', '먼저 상단에서 엑셀 파일을 업로드하고 불러오기를 클릭해주세요.'); return; }
   if (!g_results.length) { setInvStatus('error', '불러오기를 먼저 실행해주세요.'); return; }
+  if (g_fromCache) { setInvStatus('error', '보안을 위해 민감정보(주민번호·주소)는 저장하지 않습니다. 엑셀 파일을 다시 업로드한 뒤 생성해주세요.'); return; }
 
   const dates = {
     start:   document.getElementById('date_start').value,
