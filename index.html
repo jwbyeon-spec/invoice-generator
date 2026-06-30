@@ -2169,6 +2169,8 @@ function makeRequestMessage(slackUserId, 이름, fields) {
   if (fields.new_words) msg += `• *신규 단어수:* ${fields.new_words}\n`;
   if (fields.rep_words) msg += `• *중복 단어수:* ${fields.rep_words}\n`;
   if (fields.work_sheet) msg += `• *작업 시트:* ${fields.work_sheet}\n`;
+  const tmLink = tmLinkFor(fields.game);
+  if (tmLink) msg += `• *TM:* <${tmLink}|시트 열기>\n`;
   if (fields.note) msg += `\n📌 *특이사항*\n${fields.note}\n`;
   msg += `\n━━━━━━━━━━━━━━━\n`;
   msg += `✅ 작업 가능하시면 → 이 메시지에 ✅ 클릭\n`;
@@ -2294,6 +2296,18 @@ function renderRequestBoard(rows) {
   }
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// ── 게임별 프리랜서 TM 시트 링크 (번역 요청 메시지에 하이퍼링크로 첨부) ──
+const TM_LINKS = {
+  '포트리스사가': 'https://docs.google.com/spreadsheets/d/1xDZ7-DA6KTR81gg4-aUVFXNonukMd4I4AvdJ6HiLCMk/edit',
+  '냥냥시노비':   'https://docs.google.com/spreadsheets/d/1asVwFMrVw943O53pmi8yVrLCihxyaXW15QLKg3zF52Q/edit',
+};
+function tmLinkFor(game) {
+  if (!game) return '';
+  const norm = String(game).replace(/\s/g, '');
+  for (const k in TM_LINKS) { if (k.replace(/\s/g, '') === norm) return TM_LINKS[k]; }
+  return '';
 }
 
 // ── TM 갱신 (Apps Script 웹앱 호출) ──
