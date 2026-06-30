@@ -426,6 +426,7 @@ body {
   <div class="tab active" data-tab="dashboard">대시보드</div>
   <div class="tab" data-tab="detail">상세 내역</div>
   <div class="tab" data-tab="request">번역 요청</div>
+  <div class="tab" data-tab="tm">TM 갱신</div>
   <div class="tab" data-tab="broadcast">전체 메세지 발송</div>
   <div class="tab" data-tab="invoice">거래명세서 생성</div>
 </div>
@@ -667,6 +668,20 @@ body {
       <div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 현황을 불러오세요</div>
     </div>
   </div>
+  </div>
+</div>
+
+<!-- ── TM 갱신 뷰 ── -->
+<div class="view" id="view-tm">
+  <div class="invoice-card">
+    <h2>TM 갱신</h2>
+    <p class="sub">개발팀 최신 내용을 프리랜서 공유 시트로 갱신합니다. 프리랜서가 보는 링크는 그대로 유지돼요.</p>
+    <hr class="section-divider">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <button class="btn-invoice" onclick="updateTM('포트리스사가')">🎮 포트리스사가 TM 갱신 <span style="font-weight:400;opacity:.85">(랭기지 + 시나리오)</span></button>
+      <button class="btn-invoice" onclick="updateTM('냥냥시노비')">🐱 냥냥시노비 TM 갱신</button>
+    </div>
+    <p style="margin-top:18px;font-size:12px;color:#94a3b8;line-height:1.6">버튼을 누르면 새 탭이 열리며 갱신 결과(✅/❌)가 표시됩니다.<br>결과 확인 후 그 탭은 닫으셔도 됩니다.</p>
   </div>
 </div>
 
@@ -2279,6 +2294,14 @@ function renderRequestBoard(rows) {
   }
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// ── TM 갱신 (Apps Script 웹앱 호출) ──
+const TM_WEBAPP_URL = 'https://script.google.com/a/macros/cookapps.com/s/AKfycbyUK4ASfY1KRds2vVcPjpxmnvPfFLo_mqkt7OoWElgAVc7aeot08FuH1ErhcU0EFgbILg/exec';
+function updateTM(game) {
+  if (!confirm(`${game} TM을 최신으로 갱신하시겠습니까?\n(프리랜서 시트 내용이 개발팀 최신본으로 덮어써집니다)`)) return;
+  const url = TM_WEBAPP_URL + '?action=updateTM&game=' + encodeURIComponent(game);
+  window.open(url, '_blank');
 }
 
 async function sendOneSlack(idx) {
