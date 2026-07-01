@@ -1202,6 +1202,24 @@ function setDashStatus(type, html) {
 // ──────────────────────────────────────────────────────────
 // 대시보드 렌더링
 // ──────────────────────────────────────────────────────────
+// 실지급 금액 계산 (거래명세서 총계와 동일 로직)
+function calcNetPay(소계, usd) {
+  if (usd) {
+    const s2 = Math.round(소계 * 100) / 100, s3 = Math.round(소계 * 1000) / 1000;
+    return Math.abs(s3 - s2) >= 0.0005 ? Math.ceil(소계 * 100) / 100 : 소계;
+  }
+  const 세금 = Math.floor(소계 * 0.033 / 10) * 10;
+  return 소계 - 세금;
+}
+
+function copyNetPay(value, btn) {
+  navigator.clipboard.writeText(String(value)).then(() => {
+    const prev = btn.textContent;
+    btn.textContent = '✅';
+    setTimeout(() => { btn.textContent = prev; }, 1200);
+  }).catch(() => { prompt('복사하세요:', value); });
+}
+
 function renderDashboard(month) {
   // 요약 바
   const totalKRW = g_results.filter(r => !r.usd).reduce((s,r) => s + r.소계, 0);
@@ -1244,6 +1262,12 @@ function renderDashboard(month) {
       ? `$${r.소계.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
       : `${fmtNum(r.소계)}원`;
     const currency = r.usd ? 'USD' : 'KRW';
+    const net = calcNetPay(r.소계, r.usd);
+    const netStr = r.usd
+      ? `$${net.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
+      : `${fmtNum(net)}원`;
+    const netCopy = r.usd ? net : Math.round(net);
+    const netLabel = r.usd ? '실지급' : '실지급 (3.3% 공제 후)';
     const key = confirmStateKey(r.sheetName, month);
     const state = g_confirmState[key] || {};
     const confirmed  = state.status === 'confirmed' || state.status === 'pdf_generated';
@@ -1308,6 +1332,13 @@ function renderDashboard(month) {
           <div class="fl-stat"><div class="val">${Object.keys(r.agg).length}</div><div class="lbl">품목수</div></div>
         </div>
         <div class="fl-amount"><span class="amt">${amtStr}</span><span class="currency">${currency}</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0">
+          <span style="font-size:12px;color:#64748b">${netLabel}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:16px;font-weight:700;color:#3b82f6">${netStr}</span>
+            <button onclick="event.stopPropagation(); copyNetPay('${netCopy}', this)" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">복사</button>
+          </span>
+        </div>
       </div>
       ${footerHtml}
       ${copyLinkHtml}
