@@ -1223,8 +1223,8 @@ function copyNetPay(value, btn) {
 
 function renderDashboard(month) {
   // 요약 바
-  const totalKRW = g_results.filter(r => !r.usd).reduce((s,r) => s + r.소계, 0);
-  const totalUSD = g_results.filter(r => r.usd).reduce((s,r) => s + r.소계, 0);
+  const totalKRW = g_results.filter(r => !r.usd).reduce((s,r) => s + calcNetPay(r.소계, false), 0);
+  const totalUSD = g_results.filter(r => r.usd).reduce((s,r) => s + calcNetPay(r.소계, true), 0);
   const totalJobs = g_results.reduce((s,r) => s + r.rows.length, 0);
 
   const sumBar = document.getElementById('summary-bar');
@@ -1240,12 +1240,12 @@ function renderDashboard(month) {
       <div class="s-value">${totalJobs}<span style="font-size:14px;color:#94a3b8;margin-left:4px">건</span></div>
     </div>
     <div class="summary-card">
-      <div class="s-label">총 정산금액 (KRW)</div>
+      <div class="s-label">총 실지급액 (KRW)</div>
       <div class="s-value">${fmtNum(totalKRW)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">원</span></div>
     </div>
     ${totalUSD > 0 ? `
     <div class="summary-card">
-      <div class="s-label">총 정산금액 (USD)</div>
+      <div class="s-label">총 실지급액 (USD)</div>
       <div class="s-value">$${totalUSD.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}</div>
     </div>` : ''}
   `;
