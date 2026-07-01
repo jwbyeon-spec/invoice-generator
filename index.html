@@ -403,6 +403,41 @@ body {
 </head>
 <body>
 
+<!-- ── 잠금 화면 (관리자 전용 커튼 / 토큰 링크는 예외) ── -->
+<div id="lock-overlay" style="position:fixed;inset:0;z-index:99999;background:#0f172a;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:36px;max-width:340px;width:90%;box-sizing:border-box;box-shadow:0 8px 40px rgba(0,0,0,.35);text-align:center;font-family:system-ui,-apple-system,sans-serif">
+    <div style="font-size:34px;margin-bottom:8px">🔒</div>
+    <h2 style="font-size:18px;margin:0 0 6px;color:#1e293b">L10N 프리랜서 관리</h2>
+    <p style="font-size:13px;color:#94a3b8;margin:0 0 18px">비밀번호를 입력하세요</p>
+    <input type="password" id="lock-pw" placeholder="비밀번호" autofocus
+      onkeydown="if(event.key==='Enter')tryUnlock()"
+      style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #e0e6ef;border-radius:8px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit">
+    <button onclick="tryUnlock()" style="width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">들어가기</button>
+    <div id="lock-msg" style="color:#ef4444;font-size:12px;margin-top:10px;min-height:14px"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var isToken = false, unlocked = false;
+  try { isToken = new URLSearchParams(location.search).has('token'); } catch(e){}
+  try { unlocked = localStorage.getItem('admin_unlocked') === '1'; } catch(e){}
+  if (isToken || unlocked) {
+    var o = document.getElementById('lock-overlay');
+    if (o) o.style.display = 'none';
+  }
+})();
+function tryUnlock(){
+  var v = document.getElementById('lock-pw').value;
+  if (v === 'cook1234') {
+    try { localStorage.setItem('admin_unlocked','1'); } catch(e){}
+    document.getElementById('lock-overlay').style.display = 'none';
+  } else {
+    document.getElementById('lock-msg').textContent = '비밀번호가 올바르지 않습니다.';
+    document.getElementById('lock-pw').value = '';
+  }
+}
+</script>
+
 <!-- ── 상단 헤더 ── -->
 <div class="app-header">
   <h1>📊 L10N 프리랜서 관리</h1>
