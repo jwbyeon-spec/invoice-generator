@@ -1841,7 +1841,6 @@ function renderTokenDetail() {
   const info = r.info || {};
   const fields = [
     ['이름', info['이름'] || r.sheetMeta.영문명],
-    ['영문명', info['영문 이름'] || r.sheetMeta.영문명],
     ['이메일', info['이메일'] || '-'],
     ['언어', r.sheetMeta.언어],
     ['통화', r.usd ? 'USD' : 'KRW'],
