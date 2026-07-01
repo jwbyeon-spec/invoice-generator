@@ -1302,10 +1302,9 @@ function renderDashboard(month) {
          </div>`
       : '';
 
-    const quietHtml = (pdfDone || confirmed)
+    const quietHtml = confirmed
       ? `<div class="flc-quiet">
-           ${pdfDone ? `<button class="flc-quiet-btn" onclick="event.stopPropagation(); regenPdf(${i})">↻ 재생성</button>` : ''}
-           ${confirmed ? `<button class="flc-quiet-btn danger" onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">↩ 확인 취소</button>` : ''}
+           <button class="flc-quiet-btn danger" onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">↩ 확인 취소</button>
          </div>`
       : '';
 
