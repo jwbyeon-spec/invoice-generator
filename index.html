@@ -132,34 +132,37 @@ body {
 .fl-card {
   background: #fff; border-radius: 12px;
   box-shadow: 0 1px 6px rgba(0,0,0,.07);
-  overflow: hidden; cursor: pointer;
+  cursor: pointer; padding: 16px 18px; position: relative;
   transition: box-shadow .2s, transform .15s;
   border: 2px solid transparent;
 }
 .fl-card:hover { box-shadow: 0 4px 16px rgba(59,130,246,.15); transform: translateY(-2px); border-color: #93c5fd; }
-.fl-card-header {
-  background: #f8fafc; padding: 14px 18px;
-  border-bottom: 1px solid #e2e8f0;
-  display: flex; align-items: center; justify-content: space-between;
-}
+.fl-card.selected { border-color: #7c3aed; box-shadow: 0 0 0 2px #c4b5fd; }
+.flc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.flc-idline { display: flex; align-items: flex-start; gap: 9px; }
 .fl-name { font-size: 15px; font-weight: 700; color: #1e293b; }
-.fl-lang { font-size: 12px; color: #64748b; background: #e2e8f0; padding: 2px 8px; border-radius: 20px; }
-.fl-card-body { padding: 14px 18px; }
-.fl-stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.fl-stat { text-align: center; flex: 1; }
-.fl-stat .val { font-size: 18px; font-weight: 700; color: #1e293b; }
-.fl-stat .lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-.fl-stat-divider { width: 1px; background: #e2e8f0; margin: 0 8px; }
-.fl-amount {
-  margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;
-  display: flex; align-items: baseline; gap: 6px;
-}
-.fl-amount .amt { font-size: 18px; font-weight: 700; color: #1e293b; }
-.fl-amount .currency { font-size: 12px; color: #94a3b8; }
-.fl-card-footer {
-  padding: 10px 18px; border-top: 1px solid #f0f0f0;
-  font-size: 12px; color: #3b82f6; text-align: right;
-}
+.flc-lang { font-size: 13px; color: #94a3b8; margin-top: 1px; }
+.flc-chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+.flc-chip.pending { background: #fef3c7; color: #92400e; }
+.flc-chip.ok { background: #d1fae5; color: #065f46; }
+.flc-chip.pdf { background: #dbeafe; color: #1e40af; }
+.flc-gentime { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+.flc-amount-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.flc-net-lbl { font-size: 12px; color: #94a3b8; margin-bottom: 2px; }
+.flc-net { font-size: 24px; font-weight: 700; color: #1e293b; line-height: 1.15; }
+.flc-net .u { font-size: 14px; color: #94a3b8; font-weight: 400; margin-left: 1px; }
+.flc-sub { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+.flc-copy { height: 32px; padding: 0 12px; font-size: 12px; font-weight: 600; background: #eef2ff; color: #3b82f6; border: 1px solid #c7d2fe; border-radius: 8px; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+.flc-copy:hover { background: #e0e7ff; }
+.flc-actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+.flc-act { flex: 1; height: 32px; font-size: 12px; font-weight: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; color: #475569; cursor: pointer; font-family: inherit; }
+.flc-act:hover { border-color: #3b82f6; color: #3b82f6; }
+.flc-act.sent { background: #22c55e; border-color: #22c55e; color: #fff; }
+.flc-quiet { display: flex; gap: 16px; justify-content: center; margin-top: 10px; }
+.flc-quiet-btn { border: none; background: none; padding: 2px 4px; font-size: 12px; color: #94a3b8; cursor: pointer; font-family: inherit; }
+.flc-quiet-btn:hover { color: #64748b; }
+.flc-quiet-btn.danger { color: #ef4444; }
+.flc-quiet-btn.danger:hover { color: #dc2626; }
 
 .admin-controls {
   background: #1e293b; border: 1px solid #334155; border-radius: 12px;
@@ -222,11 +225,9 @@ body {
 
 /* 카드 체크박스 (관리자) */
 .fl-card-checkbox {
-  position: absolute; top: 14px; right: 14px;
-  width: 18px; height: 18px; cursor: pointer; accent-color: #7c3aed;
+  width: 17px; height: 17px; cursor: pointer; accent-color: #7c3aed;
+  margin-top: 3px; flex-shrink: 0;
 }
-.fl-card { position: relative; }
-.fl-card.selected { border-color: #7c3aed; box-shadow: 0 0 0 2px #c4b5fd; }
 
 /* PDF 상태 뱃지 */
 .pdf-badge {
@@ -1261,88 +1262,78 @@ function renderDashboard(month) {
     const amtStr = r.usd
       ? `$${r.소계.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
       : `${fmtNum(r.소계)}원`;
-    const currency = r.usd ? 'USD' : 'KRW';
     const net = calcNetPay(r.소계, r.usd);
-    const netStr = r.usd
+    const netHtml = r.usd
       ? `$${net.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}`
-      : `${fmtNum(net)}원`;
+      : `${fmtNum(net)}<span class="u">원</span>`;
     const netCopy = r.usd ? net : Math.round(net);
-    const netLabel = r.usd ? '실지급' : '실지급 (3.3% 공제 후)';
+    const netLabel = r.usd ? '실지급' : '실지급 · 3.3% 공제 후';
+    const subLine = `공급가액 ${amtStr} · 작업 ${r.rows.length}건 · 품목 ${Object.keys(r.agg).length}개`;
+
     const key = confirmStateKey(r.sheetName, month);
     const state = g_confirmState[key] || {};
     const confirmed  = state.status === 'confirmed' || state.status === 'pdf_generated';
     const pdfDone    = state.status === 'pdf_generated';
+    const selected   = g_selected.has(i);
 
-    const footerHtml = confirmed
-      ? `<div class="fl-card-footer" style="color:#16a34a">✅ 이상없음 제출완료</div>`
-      : `<div class="fl-card-footer">상세 내역 보기 →</div>`;
-
-    const adminCheckbox = confirmed
-      ? `<input type="checkbox" class="fl-card-checkbox" id="chk_${i}"
-           onclick="event.stopPropagation(); toggleCardSelect(${i}, this)">`
-      : '';
-    let pdfStatusHtml = '';
-    if (pdfDone) {
-      const genTime = state.pdfGeneratedAt
-        ? new Date(state.pdfGeneratedAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
-        : '';
-      pdfStatusHtml = `
-        <div style="padding:8px 18px 12px;border-top:1px solid #f0f0f0">
-          <span class="pdf-badge done">PDF생성완료</span>
-          <span style="font-size:11px;color:#64748b;margin-left:6px">생성일시: ${genTime}</span><br>
-          <button class="btn-pdf-regen" onclick="event.stopPropagation(); regenPdf(${i})">재생성</button>
-        </div>`;
-    } else {
-      pdfStatusHtml = `
-        <div style="padding:8px 18px 10px;border-top:1px solid #f0f0f0">
-          <span class="pdf-badge pending">${confirmed ? 'PDF 미생성' : '미확인'}</span>
-        </div>`;
+    let genTime = '';
+    if (pdfDone && state.pdfGeneratedAt) {
+      const t = new Date(state.pdfGeneratedAt);
+      genTime = `${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')} 생성`;
     }
+    const statusChip = pdfDone
+      ? `<span class="flc-chip pdf">📄 PDF 완료</span>`
+      : confirmed
+        ? `<span class="flc-chip ok">✅ 확인완료</span>`
+        : `<span class="flc-chip pending">미확인</span>`;
 
     const token = g_tokens[key];
     const slackCh = r.info ? String(r.info['슬랙 채널'] || '').trim() : '';
-    const copyLinkHtml = token
-      ? `<div style="padding:6px 18px 10px;border-top:1px solid #f0f0f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-           <button class="btn-copy-link" id="cpbtn_${i}"
-             onclick="event.stopPropagation(); copyFreelancerLink('${token}', '${esc(이름표시)}', ${i})">
-             🔗 링크 복사
-           </button>
-           ${slackCh ? `<button class="btn-slack-send" id="slackbtn_${i}"
-             onclick="event.stopPropagation(); sendOneSlack(${i})">
-             💬 슬랙 전송
-           </button>` : ''}
-           ${confirmed ? `<button class="btn-reset-confirm"
-             onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">
-             ↩ 확인 취소
-           </button>` : ''}
+
+    const checkboxHtml = confirmed
+      ? `<input type="checkbox" class="fl-card-checkbox" id="chk_${i}" ${selected ? 'checked' : ''}
+           onclick="event.stopPropagation(); toggleCardSelect(${i}, this)">`
+      : '';
+
+    const actionsHtml = token
+      ? `<div class="flc-actions">
+           <button class="flc-act" id="cpbtn_${i}" onclick="event.stopPropagation(); copyFreelancerLink('${token}', '${esc(이름표시)}', ${i})">🔗 링크</button>
+           ${slackCh ? `<button class="flc-act" id="slackbtn_${i}" onclick="event.stopPropagation(); sendOneSlack(${i})">💬 슬랙</button>` : ''}
+         </div>`
+      : '';
+
+    const quietHtml = (pdfDone || confirmed)
+      ? `<div class="flc-quiet">
+           ${pdfDone ? `<button class="flc-quiet-btn" onclick="event.stopPropagation(); regenPdf(${i})">↻ 재생성</button>` : ''}
+           ${confirmed ? `<button class="flc-quiet-btn danger" onclick="event.stopPropagation(); resetConfirm('${r.sheetName}', ${month}, ${i})">↩ 확인 취소</button>` : ''}
          </div>`
       : '';
 
     return `
-    <div class="fl-card" id="fl-card-${i}" onclick="goToDetail(${i})">
-      ${adminCheckbox}
-      <div class="fl-card-header">
-        <span class="fl-name">${esc(이름표시)} <span style="font-size:12px;font-weight:400;color:#94a3b8">(${esc(r.sheetMeta.영문명)})</span></span>
-        <span class="fl-lang">${esc(r.sheetMeta.언어)}</span>
-      </div>
-      <div class="fl-card-body">
-        <div class="fl-stat-row">
-          <div class="fl-stat"><div class="val">${r.rows.length}</div><div class="lbl">작업건수</div></div>
-          <div class="fl-stat-divider"></div>
-          <div class="fl-stat"><div class="val">${Object.keys(r.agg).length}</div><div class="lbl">품목수</div></div>
+    <div class="fl-card${selected ? ' selected' : ''}" id="fl-card-${i}" onclick="goToDetail(${i})">
+      <div class="flc-top">
+        <div class="flc-idline">
+          ${checkboxHtml}
+          <div>
+            <div class="fl-name">${esc(이름표시)}</div>
+            <div class="flc-lang">${esc(r.sheetMeta.언어)}</div>
+          </div>
         </div>
-        <div class="fl-amount"><span class="amt">${amtStr}</span><span class="currency">${currency}</span></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0">
-          <span style="font-size:12px;color:#64748b">${netLabel}</span>
-          <span style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:16px;font-weight:700;color:#3b82f6">${netStr}</span>
-            <button onclick="event.stopPropagation(); copyNetPay('${netCopy}', this)" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">복사</button>
-          </span>
+        <div style="text-align:right">
+          ${statusChip}
+          ${genTime ? `<div class="flc-gentime">${genTime}</div>` : ''}
         </div>
       </div>
-      ${footerHtml}
-      ${copyLinkHtml}
-      ${pdfStatusHtml}
+      <div class="flc-amount-row">
+        <div>
+          <div class="flc-net-lbl">${netLabel}</div>
+          <div class="flc-net">${netHtml}</div>
+          <div class="flc-sub">${subLine}</div>
+        </div>
+        <button class="flc-copy" onclick="event.stopPropagation(); copyNetPay('${netCopy}', this)">📋 복사</button>
+      </div>
+      ${actionsHtml}
+      ${quietHtml}
     </div>`;
   }).join('');
 
