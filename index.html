@@ -1613,10 +1613,19 @@ async function generatePdfBlob(result, dates) {
 // ──────────────────────────────────────────────────────────
 document.getElementById('btn_pdf_bulk')?.addEventListener('click', handleBulkPdf);
 
+// 재업로드 등으로 g_listInfo가 갱신됐을 때 g_results의 info를 최신으로 다시 연결
+function refreshResultsInfo() {
+  for (const r of g_results) {
+    const fresh = g_listInfo[r.sheetMeta.영문명];
+    if (fresh) r.info = fresh;
+  }
+}
+
 async function handleBulkPdf() {
   const indices = [...g_selected];
   if (!indices.length) return;
   if (g_fromCache) { alert('보안을 위해 민감정보(주민번호·주소)는 브라우저에 저장하지 않습니다.\n거래명세서를 생성하려면 엑셀 파일을 다시 업로드해주세요.'); return; }
+  refreshResultsInfo();
 
   const btn  = document.getElementById('btn_pdf_bulk');
   const prog = document.getElementById('pdf-progress');
@@ -1671,6 +1680,7 @@ async function handleBulkPdf() {
 // 개별 재생성
 async function regenPdf(idx) {
   if (g_fromCache) { alert('보안을 위해 민감정보(주민번호·주소)는 브라우저에 저장하지 않습니다.\n거래명세서를 생성하려면 엑셀 파일을 다시 업로드해주세요.'); return; }
+  refreshResultsInfo();
   const month = parseInt(document.getElementById('month').value);
   const year  = parseInt(document.getElementById('year').value);
   const dates = getAdminDates();
@@ -2613,6 +2623,7 @@ async function generateInvoice() {
   if (!g_wb) { setInvStatus('error', '먼저 상단에서 엑셀 파일을 업로드하고 불러오기를 클릭해주세요.'); return; }
   if (!g_results.length) { setInvStatus('error', '불러오기를 먼저 실행해주세요.'); return; }
   if (g_fromCache) { setInvStatus('error', '보안을 위해 민감정보(주민번호·주소)는 저장하지 않습니다. 엑셀 파일을 다시 업로드한 뒤 생성해주세요.'); return; }
+  refreshResultsInfo();
 
   const dates = {
     start:   document.getElementById('date_start').value,
