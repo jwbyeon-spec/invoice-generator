@@ -1209,8 +1209,9 @@ function calcNetPay(소계, usd) {
     const s2 = Math.round(소계 * 100) / 100, s3 = Math.round(소계 * 1000) / 1000;
     return Math.abs(s3 - s2) >= 0.0005 ? Math.ceil(소계 * 100) / 100 : 소계;
   }
-  const 세금 = Math.floor(소계 * 0.033 / 10) * 10;
-  return 소계 - 세금;
+  const 소득세 = Math.floor(소계 * 0.03 / 10) * 10;      // ROUNDDOWN(지급액*3%, -1)
+  const 지방소득세 = Math.floor(소득세 * 0.1 / 10) * 10;  // ROUNDDOWN(소득세*10%, -1)
+  return 소계 - 소득세 - 지방소득세;
 }
 
 function copyNetPay(value, btn) {
@@ -2562,7 +2563,9 @@ function makeInvoiceContent(info, sheetMeta, agg, usd, dates) {
     총계     = needsCeil ? Math.ceil(소계 * 100) / 100 : 소계;
     특이사항 = needsCeil ? '소수점 셋째 자리에서 올림' : '없음';
   } else {
-    세금     = Math.floor(소계 * 0.033 / 10) * 10;
+    const 소득세 = Math.floor(소계 * 0.03 / 10) * 10;      // ROUNDDOWN(지급액*3%, -1)
+    const 지방소득세 = Math.floor(소득세 * 0.1 / 10) * 10;  // ROUNDDOWN(소득세*10%, -1)
+    세금     = 소득세 + 지방소득세;
     총계     = 소계 - 세금;
     특이사항 = '없음';
   }
