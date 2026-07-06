@@ -153,9 +153,9 @@ body {
 .flc-net .u { font-size: 14px; color: #94a3b8; font-weight: 400; margin-left: 1px; }
 .flc-sub { font-size: 12px; color: #94a3b8; margin-top: 3px; }
 .copyable { cursor: pointer; transition: color .12s; }
-.fl-name.copyable:hover, .flc-net.copyable:hover { color: #3b82f6; }
+.fl-name.copyable:hover, .flc-net.copyable:hover, .s-value.copyable:hover { color: #3b82f6; }
 .fl-name.copyable:hover::after { content: ' 📋'; font-size: 11px; }
-.flc-net.copyable:hover::after { content: ' 📋'; font-size: 12px; vertical-align: middle; }
+.flc-net.copyable:hover::after, .s-value.copyable:hover::after { content: ' 📋'; font-size: 12px; vertical-align: middle; }
 .flc-actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
 .flc-act { flex: 1; height: 32px; font-size: 12px; font-weight: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; color: #475569; cursor: pointer; font-family: inherit; }
 .flc-act:hover { border-color: #3b82f6; color: #3b82f6; }
@@ -1246,12 +1246,12 @@ function renderDashboard(month) {
     </div>
     <div class="summary-card">
       <div class="s-label">총 실지급액 (KRW)</div>
-      <div class="s-value">${fmtNum(totalKRW)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">원</span></div>
+      <div class="s-value copyable" title="클릭하여 금액 복사" onclick="copyCell('${Math.round(totalKRW)}', this)">${fmtNum(totalKRW)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">원</span></div>
     </div>
     ${totalUSD > 0 ? `
     <div class="summary-card">
       <div class="s-label">총 실지급액 (USD)</div>
-      <div class="s-value">$${totalUSD.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}</div>
+      <div class="s-value copyable" title="클릭하여 금액 복사" onclick="copyCell('${Number(totalUSD.toFixed(3))}', this)">$${totalUSD.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:3})}</div>
     </div>` : ''}
   `;
 
