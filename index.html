@@ -152,8 +152,10 @@ body {
 .flc-net { font-size: 24px; font-weight: 700; color: #1e293b; line-height: 1.15; }
 .flc-net .u { font-size: 14px; color: #94a3b8; font-weight: 400; margin-left: 1px; }
 .flc-sub { font-size: 12px; color: #94a3b8; margin-top: 3px; }
-.flc-copy { height: 32px; padding: 0 12px; font-size: 12px; font-weight: 600; background: #eef2ff; color: #3b82f6; border: 1px solid #c7d2fe; border-radius: 8px; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
-.flc-copy:hover { background: #e0e7ff; }
+.copyable { cursor: pointer; transition: color .12s; }
+.fl-name.copyable:hover, .flc-net.copyable:hover { color: #3b82f6; }
+.fl-name.copyable:hover::after { content: ' 📋'; font-size: 11px; }
+.flc-net.copyable:hover::after { content: ' 📋'; font-size: 12px; vertical-align: middle; }
 .flc-actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
 .flc-act { flex: 1; height: 32px; font-size: 12px; font-weight: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; color: #475569; cursor: pointer; font-family: inherit; }
 .flc-act:hover { border-color: #3b82f6; color: #3b82f6; }
@@ -1214,11 +1216,13 @@ function calcNetPay(소계, usd) {
   return 소계 - 소득세 - 지방소득세;
 }
 
-function copyNetPay(value, btn) {
+function copyCell(value, el) {
   navigator.clipboard.writeText(String(value)).then(() => {
-    const prev = btn.textContent;
-    btn.textContent = '✅';
-    setTimeout(() => { btn.textContent = prev; }, 1200);
+    if (el.dataset.copying) return;
+    el.dataset.copying = '1';
+    const prev = el.innerHTML;
+    el.innerHTML = '✅ 복사됨';
+    setTimeout(() => { el.innerHTML = prev; delete el.dataset.copying; }, 1000);
   }).catch(() => { prompt('복사하세요:', value); });
 }
 
@@ -1315,7 +1319,7 @@ function renderDashboard(month) {
         <div class="flc-idline">
           ${checkboxHtml}
           <div>
-            <div class="fl-name">${esc(이름표시)}</div>
+            <div class="fl-name copyable" title="클릭하여 이름 복사" onclick="event.stopPropagation(); copyCell('${esc(이름표시)}', this)">${esc(이름표시)}</div>
             <div class="flc-lang">${esc(r.sheetMeta.언어)}</div>
           </div>
         </div>
@@ -1327,10 +1331,9 @@ function renderDashboard(month) {
       <div class="flc-amount-row">
         <div>
           <div class="flc-net-lbl">${netLabel}</div>
-          <div class="flc-net">${netHtml}</div>
+          <div class="flc-net copyable" title="클릭하여 실지급액 복사" onclick="event.stopPropagation(); copyCell('${netCopy}', this)">${netHtml}</div>
           <div class="flc-sub">${subLine}</div>
         </div>
-        <button class="flc-copy" onclick="event.stopPropagation(); copyNetPay('${netCopy}', this)">📋 복사</button>
       </div>
       ${actionsHtml}
       ${quietHtml}
