@@ -466,6 +466,7 @@ function tryUnlock(){
   <div class="tab active" data-tab="dashboard">대시보드</div>
   <div class="tab" data-tab="detail">상세 내역</div>
   <div class="tab" data-tab="request">번역 요청</div>
+  <div class="tab" data-tab="review">AI 검수</div>
   <div class="tab" data-tab="tm">TM 갱신</div>
   <div class="tab" data-tab="broadcast">전체 메세지 발송</div>
   <div class="tab" data-tab="invoice">거래명세서 생성</div>
@@ -708,6 +709,20 @@ function tryUnlock(){
       <div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 현황을 불러오세요</div>
     </div>
   </div>
+  </div>
+</div>
+
+<!-- ── AI 검수 뷰 ── -->
+<div class="view" id="view-review">
+  <div class="invoice-card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">AI 검수</h2>
+      <span style="font-size:12px;color:#94a3b8">종료 처리 안 된 요청만 표시됩니다</span>
+      <button onclick="loadReviewBoard()" style="margin-left:auto;background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
+    </div>
+    <p class="sub">완료된 번역 작업의 시트를 열별(도착어)로 검수합니다. 숫자·변수·태그 보존 / 미번역 / 오번역을 확인해요.</p>
+    <div id="review_board" style="margin-top:8px"><div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 목록을 불러오세요</div></div>
+    <div id="review_panel"></div>
   </div>
 </div>
 
@@ -970,6 +985,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('view-' + this.dataset.tab).classList.add('active');
     if (this.dataset.tab === 'broadcast') renderBroadcastList();
     if (this.dataset.tab === 'request') { renderRequestList(); loadRequestBoard(); }
+    if (this.dataset.tab === 'review') loadReviewBoard();
   });
 });
 
@@ -2413,6 +2429,152 @@ function renderRequestBoard(rows) {
   }
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// ── AI 검수 ──
+let g_reviewGroups = [];
+
+async function loadReviewBoard() {
+  const wrap = document.getElementById('review_board');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="empty-state" style="padding:20px">불러오는 중...</div>';
+  document.getElementById('review_panel').innerHTML = '';
+  try {
+    const rows = await supaFetch('translation_requests?closed_at=is.null&order=created_at.desc', 'GET');
+    renderReviewBoard(rows);
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state" style="padding:20px;color:#ef4444">불러오기 실패: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderReviewBoard(rows) {
+  const wrap = document.getElementById('review_board');
+  if (!Array.isArray(rows) || !rows.length) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:20px">🎉 미종료 요청이 없습니다</div>';
+    g_reviewGroups = [];
+    return;
+  }
+  const map = new Map();
+  for (const r of rows) {
+    const key = [r.game, r.item, r.deadline, r.work_sheet].join('|');
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(r);
+  }
+  g_reviewGroups = [...map.values()];
+  const dDate = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 6 ? `${d.slice(2,4)}.${d.slice(4,6)}` : (d || '-'); };
+  const badge = s => s === 'done' ? '🎉' : s === 'accepted' ? '✅' : '⏳';
+
+  wrap.innerHTML = g_reviewGroups.map((g, gi) => {
+    const f = g[0];
+    const names = g.map(r => `${badge(r.status)} ${esc(r.freelancer_name)}`).join(' · ');
+    const sheet = f.work_sheet
+      ? `<a href="${esc(f.work_sheet)}" target="_blank" rel="noopener" style="color:#3b82f6;font-weight:600;text-decoration:none;white-space:nowrap">작업시트 ↗</a>`
+      : '<span style="color:#cbd5e1">시트 링크 없음</span>';
+    return `<div style="border:1px solid #e0e6ef;border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fff">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-weight:700;font-size:15px">${esc(f.game || '-')} · ${esc(f.item || '-')}</span>
+        <span style="font-size:12px;color:#94a3b8">마감 ${dDate(f.deadline)}</span>
+        <span style="margin-left:auto">${sheet}</span>
+      </div>
+      <div style="font-size:13px;color:#475569;margin-bottom:12px">${names}</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="openReview(${gi})" ${f.work_sheet ? '' : 'disabled'} style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit${f.work_sheet ? '' : ';opacity:.4;cursor:not-allowed'}">🔍 검수</button>
+        <button onclick="closeRequest(${gi})" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit">✅ 종료 처리</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function closeRequest(gi) {
+  const g = g_reviewGroups[gi];
+  if (!g) return;
+  const f = g[0];
+  if (!confirm(`"${f.game || ''} · ${f.item || ''}" 요청을 종료 처리할까요?\n미종료 목록에서 사라집니다.`)) return;
+  const ids = g.map(r => r.id).filter(x => x != null);
+  if (!ids.length) { alert('요청 id를 찾지 못했습니다.'); return; }
+  try {
+    await supaFetch(`translation_requests?id=in.(${ids.map(encodeURIComponent).join(',')})`, 'PATCH', { closed_at: new Date().toISOString() });
+    loadReviewBoard();
+  } catch(e) { alert('종료 처리 실패: ' + e.message); }
+}
+
+async function openReview(gi) {
+  const g = g_reviewGroups[gi];
+  if (!g) return;
+  const f = g[0];
+  const panel = document.getElementById('review_panel');
+  panel.innerHTML = `<div style="padding:16px;color:#64748b">시트 열 정보 불러오는 중...</div>`;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    const res = await jsonpCall(TM_WEBAPP_URL + '?action=sheetCols&url=' + encodeURIComponent(f.work_sheet), 60000);
+    if (!res || !res.ok) throw new Error((res && res.error) || '열 정보 실패');
+    renderReviewPanel(gi, res);
+  } catch(e) {
+    panel.innerHTML = `<div style="padding:16px;color:#ef4444">열 정보 불러오기 실패: ${esc(e.message)}<br><small style="color:#94a3b8">(Apps Script에 sheetCols/review 액션이 배포됐는지 확인)</small></div>`;
+  }
+}
+
+function renderReviewPanel(gi, info) {
+  const g = g_reviewGroups[gi];
+  const f = g[0];
+  const opts = (info.cols || []).map(c => `<option value="${c.idx}">${esc(c.name)}</option>`).join('');
+  document.getElementById('review_panel').innerHTML = `
+    <div style="border:1px solid #c7d2fe;border-radius:12px;padding:16px;background:#f8faff;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-weight:700">${esc(f.game || '')} · ${esc(f.item || '')} 검수</span>
+        <span style="font-size:12px;color:#94a3b8">출발어: ${esc(info.srcName || '?')}</span>
+        <select id="review_col" style="margin-left:auto;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit">${opts}</select>
+        <button onclick="runReview(${gi})" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit">🔍 검수 시작</button>
+      </div>
+      <div id="review_result"><div style="color:#94a3b8;font-size:13px">검수할 도착어 열을 고르고 "검수 시작"을 누르세요.</div></div>
+    </div>`;
+}
+
+async function runReview(gi) {
+  const g = g_reviewGroups[gi];
+  const f = g[0];
+  const sel = document.getElementById('review_col');
+  const col = sel.value;
+  const colName = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '';
+  const rr = document.getElementById('review_result');
+  rr.innerHTML = '<div style="padding:14px;color:#64748b">🤖 AI 검수 중... (수십 초 걸릴 수 있어요)</div>';
+  try {
+    const url = TM_WEBAPP_URL + '?action=review&url=' + encodeURIComponent(f.work_sheet)
+      + '&col=' + encodeURIComponent(col) + '&lang=' + encodeURIComponent(colName);
+    const res = await jsonpCall(url, 180000);
+    if (!res || !res.ok) throw new Error((res && res.error) || '검수 실패');
+    renderReviewResult(res);
+  } catch(e) {
+    rr.innerHTML = `<div style="padding:14px;color:#ef4444">검수 실패: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderReviewResult(res) {
+  const rr = document.getElementById('review_result');
+  const items = res.findings || [];
+  if (!items.length) {
+    rr.innerHTML = '<div style="padding:14px;color:#16a34a;font-weight:600">✅ 문제를 찾지 못했어요.</div>';
+    return;
+  }
+  const cnt = { tag: 0, missing: 0, mistrans: 0 };
+  items.forEach(i => { if (cnt[i.type] !== undefined) cnt[i.type]++; });
+  const color = t => t === 'tag' ? '#ef4444' : t === 'missing' ? '#d97706' : '#3b82f6';
+  const label = t => t === 'tag' ? '태그·숫자' : t === 'missing' ? '미번역' : '오번역?';
+  let html = `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">`
+    + ['tag', 'missing', 'mistrans'].map(t => `<div style="background:#fff;border:1px solid #e0e6ef;border-radius:8px;padding:8px 14px"><div style="font-size:12px;color:#64748b">${label(t)}</div><div style="font-size:18px;font-weight:700;color:${color(t)}">${cnt[t]}</div></div>`).join('')
+    + `</div>`;
+  html += `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#64748b;border-bottom:1px solid #e0e6ef">
+    <th style="padding:6px 8px">Token</th><th style="padding:6px 8px">원문</th><th style="padding:6px 8px">번역</th><th style="padding:6px 8px">AI 제안</th></tr></thead><tbody>`;
+  for (const i of items) {
+    html += `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:6px 8px;font-family:monospace;color:${color(i.type)};word-break:break-all">${esc(i.token || '')}</td>
+      <td style="padding:6px 8px">${esc(i.src || '')}</td>
+      <td style="padding:6px 8px">${esc(i.tgt || '')}</td>
+      <td style="padding:6px 8px;color:#475569">${esc(i.suggestion || '')}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  rr.innerHTML = html;
 }
 
 // ── 게임별 프리랜서 TM 시트 링크 (번역 요청 메시지에 하이퍼링크로 첨부) ──
