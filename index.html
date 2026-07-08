@@ -2386,18 +2386,27 @@ function renderRequestBoard(rows) {
   const dDate = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 6 ? `${d.slice(2,4)}.${d.slice(4,6)}` : (d || '-'); };
   const sentAt = ts => { if (!ts) return '-'; const t = new Date(ts); return `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; };
 
+  const sheetCell = ws => ws
+    ? `<a href="${esc(ws)}" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:none;font-weight:600;white-space:nowrap">바로가기 ↗</a>`
+    : '<span style="color:#cbd5e1">-</span>';
+
   let html = `<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:2px solid #e0e6ef;color:#64748b;text-align:left">
       <th style="padding:9px 8px">프리랜서</th><th style="padding:9px 8px">게임</th><th style="padding:9px 8px">품명</th>
-      <th style="padding:9px 8px">마감</th><th style="padding:9px 8px">상태</th><th style="padding:9px 8px">보낸시각</th>
+      <th style="padding:9px 8px">마감</th><th style="padding:9px 8px">상태</th><th style="padding:9px 8px">작업시트</th><th style="padding:9px 8px">보낸시각</th>
     </tr></thead><tbody>`;
+  let prevKey = null;
   for (const r of rows) {
-    html += `<tr style="border-bottom:1px solid #f0f0f0;color:#1e293b">
+    const gkey = [r.game, r.item, r.deadline, r.work_sheet].join('|');
+    const divider = prevKey !== null && gkey !== prevKey;
+    prevKey = gkey;
+    html += `<tr style="border-bottom:1px solid #f0f0f0;color:#1e293b${divider ? ';border-top:2px solid #cbd5e1' : ''}">
       <td style="padding:9px 8px;font-weight:600">${esc(r.freelancer_name)}</td>
       <td style="padding:9px 8px">${esc(r.game || '-')}</td>
       <td style="padding:9px 8px">${esc(r.item || '-')}</td>
       <td style="padding:9px 8px">${dDate(r.deadline)}</td>
       <td style="padding:9px 8px">${badge(r.status)}</td>
+      <td style="padding:9px 8px">${sheetCell(r.work_sheet)}</td>
       <td style="padding:9px 8px;color:#94a3b8">${sentAt(r.created_at)}</td>
     </tr>`;
   }
