@@ -617,7 +617,7 @@ function tryUnlock(){
 <!-- ── 번역 요청 뷰 ── -->
 <div class="view" id="view-request">
   <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
-  <div class="invoice-card">
+  <div class="invoice-card" style="flex:0 0 400px;padding:26px 26px">
     <h2>번역 요청</h2>
     <p class="sub">프리랜서에게 작업 요청을 보냅니다. ✅ 누르면 관리시트에 자동 기록, 🎉 누르면 완료 알림이 옵니다.</p>
 
@@ -696,7 +696,7 @@ function tryUnlock(){
   </div>
 
   <!-- 요청 현황 보드 -->
-  <div class="invoice-card" style="flex:1;min-width:440px;max-width:820px">
+  <div class="invoice-card" style="flex:1 1 auto;min-width:520px;max-width:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
       <h2 style="margin:0">요청 현황</h2>
       <button onclick="loadRequestBoard()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
@@ -714,14 +714,17 @@ function tryUnlock(){
 
 <!-- ── AI 검수 뷰 ── -->
 <div class="view" id="view-review">
-  <div class="invoice-card">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">AI 검수</h2>
-      <span style="font-size:12px;color:#94a3b8">종료 처리 안 된 요청만 표시됩니다</span>
-      <button onclick="loadReviewBoard()" style="margin-left:auto;background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
+  <div class="invoice-card" style="max-width:900px">
+    <h2>AI 검수</h2>
+    <p class="sub">작업 시트 링크를 넣고 도착어 열을 골라 검수합니다. 숫자·변수·태그 보존 / 미번역 / 오번역을 확인해요.</p>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
+      <div class="field" style="flex:1;min-width:280px;margin:0">
+        <label>작업 시트 링크</label>
+        <input type="text" id="review_url" placeholder="https://docs.google.com/..."
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
+      </div>
+      <button onclick="reviewLoadCols()" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">열 불러오기</button>
     </div>
-    <p class="sub">완료된 번역 작업의 시트를 열별(도착어)로 검수합니다. 숫자·변수·태그 보존 / 미번역 / 오번역을 확인해요.</p>
-    <div id="review_board" style="margin-top:8px"><div class="empty-state" style="padding:20px">🔄 새로고침을 눌러 목록을 불러오세요</div></div>
     <div id="review_panel"></div>
   </div>
 </div>
@@ -985,7 +988,6 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('view-' + this.dataset.tab).classList.add('active');
     if (this.dataset.tab === 'broadcast') renderBroadcastList();
     if (this.dataset.tab === 'request') { renderRequestList(); loadRequestBoard(); }
-    if (this.dataset.tab === 'review') loadReviewBoard();
   });
 });
 
@@ -2409,8 +2411,11 @@ function renderRequestBoard(rows) {
   let html = `<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:2px solid #e0e6ef;color:#64748b;text-align:left">
       <th style="padding:9px 8px">프리랜서</th><th style="padding:9px 8px">게임</th><th style="padding:9px 8px">품명</th>
-      <th style="padding:9px 8px">마감</th><th style="padding:9px 8px">상태</th><th style="padding:9px 8px">작업시트</th><th style="padding:9px 8px">보낸시각</th>
+      <th style="padding:9px 8px;white-space:nowrap">마감</th><th style="padding:9px 8px;white-space:nowrap">상태</th><th style="padding:9px 8px;white-space:nowrap">작업시트</th><th style="padding:9px 8px;white-space:nowrap">검수</th><th style="padding:9px 8px;white-space:nowrap">보낸시각</th>
     </tr></thead><tbody>`;
+  const reviewBtn = r => (r.status === 'done' && r.work_sheet)
+    ? `<button onclick="reviewFromRequest('${esc(r.work_sheet)}','${esc((r.game || '') + ' · ' + (r.item || ''))}')" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔍 검수</button>`
+    : '';
   let prevKey = null;
   for (const r of rows) {
     const gkey = [r.game, r.item, r.deadline, r.work_sheet].join('|');
@@ -2419,12 +2424,13 @@ function renderRequestBoard(rows) {
     prevKey = gkey;
     html += `<tr style="border-bottom:1px solid #f0f0f0;color:#1e293b${divider ? ';border-top:2px solid #cbd5e1' : ''}">
       <td style="padding:9px 8px;font-weight:600">${esc(r.freelancer_name)}</td>
-      <td style="padding:9px 8px">${esc(r.game || '-')}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${esc(r.game || '-')}</td>
       <td style="padding:9px 8px">${esc(r.item || '-')}</td>
-      <td style="padding:9px 8px">${dDate(r.deadline)}</td>
-      <td style="padding:9px 8px">${badge(r.status)}</td>
-      <td style="padding:9px 8px">${isNewGroup ? sheetCell(r.work_sheet) : ''}</td>
-      <td style="padding:9px 8px;color:#94a3b8">${sentAt(r.created_at)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${dDate(r.deadline)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${badge(r.status)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${isNewGroup ? sheetCell(r.work_sheet) : ''}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${reviewBtn(r)}</td>
+      <td style="padding:9px 8px;color:#94a3b8;white-space:nowrap">${sentAt(r.created_at)}</td>
     </tr>`;
   }
   html += '</tbody></table>';
@@ -2432,114 +2438,69 @@ function renderRequestBoard(rows) {
 }
 
 // ── AI 검수 ──
-let g_reviewGroups = [];
+let g_reviewUrl = '';
 
-async function loadReviewBoard() {
-  const wrap = document.getElementById('review_board');
-  if (!wrap) return;
-  wrap.innerHTML = '<div class="empty-state" style="padding:20px">불러오는 중...</div>';
-  document.getElementById('review_panel').innerHTML = '';
-  try {
-    const rows = await supaFetch('translation_requests?closed_at=is.null&order=created_at.desc', 'GET');
-    renderReviewBoard(rows);
-  } catch(e) {
-    wrap.innerHTML = `<div class="empty-state" style="padding:20px;color:#ef4444">불러오기 실패: ${esc(e.message)}</div>`;
-  }
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const tab = document.querySelector(`[data-tab="${name}"]`);
+  if (tab) tab.classList.add('active');
+  const view = document.getElementById('view-' + name);
+  if (view) view.classList.add('active');
 }
 
-function renderReviewBoard(rows) {
-  const wrap = document.getElementById('review_board');
-  if (!Array.isArray(rows) || !rows.length) {
-    wrap.innerHTML = '<div class="empty-state" style="padding:20px">🎉 미종료 요청이 없습니다</div>';
-    g_reviewGroups = [];
-    return;
-  }
-  const map = new Map();
-  for (const r of rows) {
-    const key = [r.game, r.item, r.deadline, r.work_sheet].join('|');
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(r);
-  }
-  g_reviewGroups = [...map.values()];
-  const dDate = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 6 ? `${d.slice(2,4)}.${d.slice(4,6)}` : (d || '-'); };
-  const badge = s => s === 'done' ? '🎉' : s === 'accepted' ? '✅' : '⏳';
-
-  wrap.innerHTML = g_reviewGroups.map((g, gi) => {
-    const f = g[0];
-    const names = g.map(r => `${badge(r.status)} ${esc(r.freelancer_name)}`).join(' · ');
-    const sheet = f.work_sheet
-      ? `<a href="${esc(f.work_sheet)}" target="_blank" rel="noopener" style="color:#3b82f6;font-weight:600;text-decoration:none;white-space:nowrap">작업시트 ↗</a>`
-      : '<span style="color:#cbd5e1">시트 링크 없음</span>';
-    return `<div style="border:1px solid #e0e6ef;border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fff">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-weight:700;font-size:15px">${esc(f.game || '-')} · ${esc(f.item || '-')}</span>
-        <span style="font-size:12px;color:#94a3b8">마감 ${dDate(f.deadline)}</span>
-        <span style="margin-left:auto">${sheet}</span>
-      </div>
-      <div style="font-size:13px;color:#475569;margin-bottom:12px">${names}</div>
-      <div style="display:flex;gap:8px">
-        <button onclick="openReview(${gi})" ${f.work_sheet ? '' : 'disabled'} style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit${f.work_sheet ? '' : ';opacity:.4;cursor:not-allowed'}">🔍 검수</button>
-        <button onclick="closeRequest(${gi})" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit">✅ 종료 처리</button>
-      </div>
-    </div>`;
-  }).join('');
+function reviewLoadCols() {
+  const url = (document.getElementById('review_url').value || '').trim();
+  if (!url) { alert('작업 시트 링크를 입력하세요.'); return; }
+  openReviewForSheet(url, '');
 }
 
-async function closeRequest(gi) {
-  const g = g_reviewGroups[gi];
-  if (!g) return;
-  const f = g[0];
-  if (!confirm(`"${f.game || ''} · ${f.item || ''}" 요청을 종료 처리할까요?\n미종료 목록에서 사라집니다.`)) return;
-  const ids = g.map(r => r.id).filter(x => x != null);
-  if (!ids.length) { alert('요청 id를 찾지 못했습니다.'); return; }
-  try {
-    await supaFetch(`translation_requests?id=in.(${ids.map(encodeURIComponent).join(',')})`, 'PATCH', { closed_at: new Date().toISOString() });
-    loadReviewBoard();
-  } catch(e) { alert('종료 처리 실패: ' + e.message); }
+// 요청 현황 "검수" 버튼에서 호출
+function reviewFromRequest(url, title) {
+  activateTab('review');
+  const input = document.getElementById('review_url');
+  if (input) input.value = url;
+  openReviewForSheet(url, title);
 }
 
-async function openReview(gi) {
-  const g = g_reviewGroups[gi];
-  if (!g) return;
-  const f = g[0];
+async function openReviewForSheet(url, title) {
+  g_reviewUrl = url;
   const panel = document.getElementById('review_panel');
   panel.innerHTML = `<div style="padding:16px;color:#64748b">시트 열 정보 불러오는 중...</div>`;
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   try {
-    const res = await jsonpCall(TM_WEBAPP_URL + '?action=sheetCols&url=' + encodeURIComponent(f.work_sheet), 60000);
+    const res = await jsonpCall(TM_WEBAPP_URL + '?action=sheetCols&url=' + encodeURIComponent(url), 60000);
     if (!res || !res.ok) throw new Error((res && res.error) || '열 정보 실패');
-    renderReviewPanel(gi, res);
+    renderReviewPanel(title, res);
   } catch(e) {
     panel.innerHTML = `<div style="padding:16px;color:#ef4444">열 정보 불러오기 실패: ${esc(e.message)}<br><small style="color:#94a3b8">(Apps Script에 sheetCols/review 액션이 배포됐는지 확인)</small></div>`;
   }
 }
 
-function renderReviewPanel(gi, info) {
-  const g = g_reviewGroups[gi];
-  const f = g[0];
+function renderReviewPanel(title, info) {
   const opts = (info.cols || []).map(c => `<option value="${c.idx}">${esc(c.name)}</option>`).join('');
+  const head = title ? `<span style="font-weight:700">${esc(title)}</span>` : '';
   document.getElementById('review_panel').innerHTML = `
     <div style="border:1px solid #c7d2fe;border-radius:12px;padding:16px;background:#f8faff;margin-top:8px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <span style="font-weight:700">${esc(f.game || '')} · ${esc(f.item || '')} 검수</span>
+        ${head}
         <span style="font-size:12px;color:#94a3b8">출발어: ${esc(info.srcName || '?')}</span>
         <select id="review_col" style="margin-left:auto;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit">${opts}</select>
-        <button onclick="runReview(${gi})" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit">🔍 검수 시작</button>
+        <button onclick="runReview()" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-family:inherit">🔍 검수 시작</button>
       </div>
       <div id="review_result"><div style="color:#94a3b8;font-size:13px">검수할 도착어 열을 고르고 "검수 시작"을 누르세요.</div></div>
     </div>`;
 }
 
-async function runReview(gi) {
-  const g = g_reviewGroups[gi];
-  const f = g[0];
+async function runReview() {
   const sel = document.getElementById('review_col');
+  if (!sel) return;
   const col = sel.value;
   const colName = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '';
   const rr = document.getElementById('review_result');
   rr.innerHTML = '<div style="padding:14px;color:#64748b">🤖 AI 검수 중... (수십 초 걸릴 수 있어요)</div>';
   try {
-    const url = TM_WEBAPP_URL + '?action=review&url=' + encodeURIComponent(f.work_sheet)
+    const url = TM_WEBAPP_URL + '?action=review&url=' + encodeURIComponent(g_reviewUrl)
       + '&col=' + encodeURIComponent(col) + '&lang=' + encodeURIComponent(colName);
     const res = await jsonpCall(url, 180000);
     if (!res || !res.ok) throw new Error((res && res.error) || '검수 실패');
