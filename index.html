@@ -469,7 +469,7 @@ function tryUnlock(){
   <div class="tab" data-tab="review">AI 검수</div>
   <div class="tab" data-tab="tm">TM 갱신</div>
   <div class="tab" data-tab="broadcast">전체 메세지 발송</div>
-  <div class="tab" data-tab="invoice">거래명세서 생성</div>
+  <div class="tab" data-tab="contract">계약서 생성</div>
 </div>
 
 <!-- ── 대시보드 뷰 ── -->
@@ -550,37 +550,45 @@ function tryUnlock(){
   </div>
 </div>
 
-<!-- ── 거래명세서 생성 뷰 ── -->
-<div class="view" id="view-invoice">
+<!-- ── 계약서 생성 뷰 ── -->
+<div class="view" id="view-contract">
   <div class="invoice-card">
-    <h2>거래명세서 생성</h2>
-    <p class="sub">날짜를 설정하고 미리보기 / PDF 저장을 진행하세요</p>
+    <h2>계약서 생성</h2>
+    <p class="sub">프리랜서를 선택하면 을(乙) 정보와 단가가 자동으로 채워집니다. 계약기간·계약일 확인 후 미리보기 → 브라우저 인쇄로 PDF 저장하세요.</p>
 
     <hr class="section-divider">
 
-    <div class="row2">
-      <div class="field">
-        <label>작업개시일</label>
-        <input type="date" id="date_start">
-      </div>
-      <div class="field">
-        <label>작업완료일</label>
-        <input type="date" id="date_end">
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>검수완료일</label>
-        <input type="date" id="date_inspect">
-      </div>
-      <div class="field">
-        <label>발행일</label>
-        <input type="date" id="date_issue">
-      </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>프리랜서</label>
+      <select id="ct_person" onchange="ctFill()"
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box">
+        <option value="">엑셀/구글시트를 먼저 불러오세요</option>
+      </select>
     </div>
 
-    <button class="btn-invoice" id="btn_print">🖨️ 미리보기 / PDF 저장</button>
-    <div class="inv-status" id="inv-status"></div>
+    <div class="row2">
+      <div class="field"><label>계약기간 시작</label><input type="date" id="ct_start"></div>
+      <div class="field"><label>계약기간 종료</label><input type="date" id="ct_end"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>계약일</label><input type="date" id="ct_date"></div>
+      <div class="field"><label>계약명(업무)</label>
+        <input type="text" id="ct_work" value="게임 번역, 검수 및 LQA"
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:14px;padding:10px 12px;outline:none;font-family:inherit;box-sizing:border-box"></div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px"><label>번역 단가 <span style="color:#64748b;font-weight:400">시트 자동 · 수정 가능</span></label>
+      <textarea id="ct_rate_tr" rows="2" placeholder="예: 한중 번역: 출발어 기준 신규 단어당 70원, 중복 단어당 21원"
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:10px 12px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea></div>
+    <div class="field" style="margin-bottom:10px"><label>검수 단가</label>
+      <textarea id="ct_rate_rv" rows="1" placeholder="예: 한중 검수: 출발어 기준 단어당 25원"
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:10px 12px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea></div>
+    <div class="field" style="margin-bottom:16px"><label>LQA 단가</label>
+      <textarea id="ct_rate_lqa" rows="1" placeholder="예: LQA: 시간당 15,000원"
+        style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:10px 12px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea></div>
+
+    <button class="btn-invoice" onclick="generateContract()">🖨️ 미리보기 / 인쇄(PDF)</button>
+    <div class="inv-status" id="ct-status"></div>
   </div>
 </div>
 
@@ -977,7 +985,6 @@ uploadBtn.addEventListener('drop', function(e) {
 });
 
 document.getElementById('btn_load').addEventListener('click', loadData);
-document.getElementById('btn_print').addEventListener('click', generateInvoice);
 
 // 탭 전환
 document.querySelectorAll('.tab').forEach(tab => {
@@ -988,6 +995,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('view-' + this.dataset.tab).classList.add('active');
     if (this.dataset.tab === 'broadcast') renderBroadcastList();
     if (this.dataset.tab === 'request') { renderRequestList(); loadRequestBoard(); }
+    if (this.dataset.tab === 'contract') initContract();
   });
 });
 
@@ -1003,10 +1011,6 @@ function setDefaultDates() {
   const first = new Date(y, m, 1);
   const last  = new Date(y, m + 1, 0);
   const toVal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  document.getElementById('date_start').value   = toVal(first);
-  document.getElementById('date_end').value     = toVal(last);
-  document.getElementById('date_inspect').value = toVal(last);
-  document.getElementById('date_issue').value   = toVal(now);
   document.getElementById('a_date_start').value   = toVal(first);
   document.getElementById('a_date_end').value     = toVal(last);
   document.getElementById('a_date_inspect').value = toVal(last);
@@ -2536,6 +2540,213 @@ function renderReviewResult(res) {
   }
   html += '</tbody></table>';
   rr.innerHTML = html;
+}
+
+// ── 계약서 생성 ──
+function initContract() {
+  const sel = document.getElementById('ct_person');
+  if (!sel) return;
+  const keys = Object.keys(g_listInfo || {});
+  sel.innerHTML = keys.length
+    ? '<option value="">— 프리랜서 선택 —</option>' + keys.map(k => `<option value="${esc(k)}">${esc(g_listInfo[k]['이름'] || k)}</option>`).join('')
+    : '<option value="">엑셀/구글시트를 먼저 불러오세요</option>';
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const cd = document.getElementById('ct_date');
+  if (cd && !cd.value) cd.value = iso(new Date());
+}
+
+function ctPick_(info, sub) {
+  const key = sub.replace(/\s/g, '');
+  for (const k in info) { if (String(k).replace(/\s/g, '').indexOf(key) > -1) return String(info[k] == null ? '' : info[k]); }
+  return '';
+}
+
+function ctFill() {
+  const info = g_listInfo[document.getElementById('ct_person').value];
+  const tr = document.getElementById('ct_rate_tr'), rv = document.getElementById('ct_rate_rv'), lq = document.getElementById('ct_rate_lqa');
+  if (!info) { tr.value = ''; rv.value = ''; lq.value = ''; return; }
+  tr.value = ctPick_(info, '번역단가');
+  rv.value = ctPick_(info, '검수단가');
+  lq.value = ctPick_(info, 'LQA');
+}
+
+function ctKDate(v) {
+  if (!v) return '';
+  const p = String(v).split('-');
+  return p.length === 3 ? `${parseInt(p[0])}년 ${parseInt(p[1])}월 ${parseInt(p[2])}일` : v;
+}
+
+function setCtStatus(type, html) {
+  const el = document.getElementById('ct-status');
+  if (!el) return;
+  el.className = 'inv-status ' + type;
+  el.innerHTML = html;
+}
+
+function generateContract() {
+  const key = document.getElementById('ct_person').value;
+  const info = key ? g_listInfo[key] : null;
+  if (!info) { alert('프리랜서를 선택하세요.'); return; }
+  const s = ctKDate(document.getElementById('ct_start').value);
+  const e = ctKDate(document.getElementById('ct_end').value);
+  const d = {
+    이름: String(info['이름'] || key),
+    신분증: String(info['주민등록번호'] || info['여권번호'] || ''),
+    신분증라벨: info['주민등록번호'] ? '주민등록번호' : '여권번호',
+    주소: String(info['주소'] || ''),
+    연락처: String(info['연락처'] || ''),
+    계좌: String(info['계좌정보'] || ''),
+    업무: (document.getElementById('ct_work').value || '게임 번역, 검수 및 LQA').trim(),
+    기간: (s && e) ? `${s}부터 ${e}까지` : (s || e || ''),
+    계약일: ctKDate(document.getElementById('ct_date').value),
+    번역단가: document.getElementById('ct_rate_tr').value.trim(),
+    검수단가: document.getElementById('ct_rate_rv').value.trim(),
+    LQA단가: document.getElementById('ct_rate_lqa').value.trim(),
+    담당자: '변지우',
+  };
+  const w = window.open('', '_blank');
+  if (!w) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.'); return; }
+  w.document.write(makeContractHTML(d));
+  w.document.close();
+  setCtStatus('success', `✅ ${esc(d.이름)} 계약서 미리보기가 열렸어요. 상단 "인쇄(PDF)" 버튼 → 대상을 "PDF로 저장" 선택.`);
+}
+
+function makeContractHTML(d) {
+  const ARTICLES = [
+    ['제1조(계약의 목적)', [
+      '본 계약은 "갑"이 "을"에게 첨부1에서 명시한 용역의 수행을 의뢰하고, "을"이 이를 수행함에 있어 "갑"과 "을" 간의 역할과 권리를 정하고 거래에 관한 전반적인 사항을 규정함에 그 목적이 있다.',
+      '또한 본 계약은 고용계약이 아닌 프리랜서(용역) 계약으로, "갑"과 "을"은 사용자와 근로자의 관계가 아님을 상호 확인한다.']],
+    ['제2조(계약업무의 범위 및 수행)', [
+      '① "갑"이 요청하는 게임에 대한 번역, 검수 및 LQA 테스트',
+      '② 번역 작업물 기한 내 제출',
+      '③ LQA 테스트에 대한 리포트 작성 및 서면 보고',
+      '단, 당사자 간 사전 서면 합의에 따라 작업의 구체적 내용과 일정을 변경 혹은 추가할 수 있다.',
+      '또한 "을"은 본 계약에 따른 용역을 독립된 계약자로서 자신의 책임하에 수행하며, "갑"의 지휘·감독을 받지 않는다.']],
+    ['제3조(업무보고 및 납품)', [
+      '① "을"은 당일 "갑"이 위탁한 업무를 완료하여 납품하여야 한다. 이 때, 산출물 전달 방식은 회사 프로세스에 따른다.',
+      '② "을"은 "갑"이 제공하는 시스템에서 LQA 테스트를 진행하고 리포트를 작성한다.',
+      '③ 각 테스트 일정에 따라 테스트한 내용과 이슈사항을 보고한다.']],
+    ['제4조(계약기간 및 계약금액)', [
+      "① 본 계약의 계약기간 및 용역비는 '주요 계약내용'에 명시된 바에 따른다.",
+      '② "갑"은 산출물의 검수가 완료 된 후 "을"에게 용역비를 \'주요 계약내용\'에 명시된 지급조건에 따라 지급하며, 계약기간 내 매월말 위탁한 용역 수행 결과에 따라 산출된 용역비를 지급한다.',
+      '③ "갑"과 "을"은 상호 신뢰 관계에 따라 상호 협의 하에 계약기간 및 조건을 조정할 수 있다. 단, 계약기간 만료일 10일 전까지 "을"로 부터의 별도의 반대 의사표시가 없을 경우 동일 조건으로 1개월씩 자동 연장된다. 이 때 각 조정에 관한 사항은 서면으로 합의하여야 한다.',
+      '본 계약은 프리랜서(용역) 계약으로, 근로기준법상 근로자에 해당하지 않으며, 4대보험, 퇴직금 등 근로계약상 의무는 적용되지 않는다.']],
+    ['제5조(검수)', [
+      '① "을"은 "갑"이 요청한 업무를 완료한 경우, "갑"의 검수를 받아야 한다. "을"은 "을"과 "갑"이 합의한 검수 기준(합의한 검수 기준이 없는 경우, "갑"이 사전에 승인한 기획안, 분량, 포맷, 품질에 따라 산출물이 제작되거나 작성되었지 여부, 위법사항이 포함되지 않았는지 여부, 동일 또는 유사한 목적으로 사용되고 "갑"이 공식적으로 공개한 산출물의 품질에 준하는 품질를 갖추고 있는지 여부)에 따라 콘텐츠를 검수한다.',
+      '② "갑"은 검수를 3영업일 내에 완료해야 할 의무가 있으며, 3영업일 내에 검수가 완료되기 어려운 경우 "을"과의 합의를 통해 기간을 조율해야 한다. 단, 검수기간은 산출물 수령후 10영업일을 초과할 수 없다.',
+      '③ 검수결과, "을"의 계약이행에 대한 전부 또는 일부에 대한 부당함을 발견하거나 사양 등이 합치되지 못한 경우에는 계약사항 범위 내에서 "을"에게 시정조치를 요구할 수 있으며, 이를 이행하지 않을 시에 손해배상의 책임을 진다.',
+      '④ "갑"은 작업물 제출일로부터 3일간, 작업의 방향이나 내용에 영향을 미치지 않는 범위 내에서 무제한으로 수정 요청을 할 수 있으며, 오탈자나 문법적 오류에 대해서는 계약 기간 내 언제든지 수정 요청이 가능하다. "을"은 이에 충실히 이행하여야 한다.']],
+    ['제6조(계약금액의 청구 및 지급)', [
+      '① "갑"은 계약업무 수행의 대가로 본 계약에서 정한 납품 및 검수 일정에 따라 검수가 완료되면 "을"에게 거래명세서를 발송하며, "을"은 이에 따른 청구서(세금계산서)를 발행하여 대금을 청구해야 하며, "갑"은 본 계약에 정한 지급조건 및 방법으로 대금을 지급한다.',
+      '② "을"이 개인일 경우 전항의 청구서 발행은 검수가 완료된 산출물의 제출로 대신할 수 있으며, 이 경우 청구서 발행일은 검수완료일이 된다.',
+      '"을"은 사업자 혹은 개인 프리랜서로서 지급받는 금액에 대한 세무 처리는 "을"의 책임 하에 수행하며, "갑"은 원천징수 및 세금신고 의무를 지지 않는다.']],
+    ['제7조(지적재산권)', [
+      '① 본 계약상 "을"이 제작하여 대행하는 제작물은 제3자의 지적재산권을 침해하지 아니하여야 한다.',
+      '② "을"이 "갑"에게 납품하는 모든 제작물의 지적재산권(상표권, 디자인권, 저작권, 2차적 저작물 작성권을 포함하며 이에 한정되지 않는다.)은 원칙적으로 "갑"에게 있다.']],
+    ['제8조(협조의무)', [
+      '"갑"은 "을"이 작업하는데 필요한 자료 및 정보 등을 제공하여야 하며, 작업수행을 위한 "을"의 요청이 있는 경우 이에 협조하여야 한다.']],
+    ['제9조(비밀유지)', [
+      '"을"은 계약기간이 종료된 이후에도 본 작업과 관련하여 지득한 일체의 정보를 외부에 누설하거나 유출해서는 안 되며, 이로 인해 "갑"에게 발생되는 손해가 있는 경우 손해배상책임이 있다.']],
+    ['제10조(품질 및 마감 준수)', [
+      '① 본 계약에 의해 완성된 성과물은 "갑"이 활용할 수 있어야 한다.',
+      '② 품질의 이상으로 제5조 제3항과 제5조 4항에 따른 수정이 완료되었음에도 성과물 활용에 있어 중대한 지장이 발생한 경우, "갑"은 "을"에게 본 용역대금의 10 %만을 지급하고 즉시 계약을 해지할 수 있다.',
+      '③ 작업물이 마감 기한을 초과할 경우, 2시간 이하의 지연 시 용역 대금에서 3%가 차감되며, 2시간을 초과할 경우 용역 대금에서 5%가 차감된다. 이러한 지연이 5회 이상 발생할 경우, "갑"은 계약을 즉시 해지할 수 있다.']],
+    ['제11조(공급원가변동에 따른 용역비의 조정)', [
+      '"을"은 이 계약을 체결한 후 콘텐츠의 개발 등에 소요되는 재료비, 노무비, 경비 등 공급원가가 변동되어 용역비의 조정이 불가피한 경우에는 회사에 용역비의 조정을 신청할 수 있다.']],
+    ['제12조(계약의 해지)', [
+      '① 상대 당사자가 정당한 사유 없이 이 계약에 따른 의무를 위반한 경우, 일방 당사자는 합리적인 기간을 정하여 서면으로 시정을 촉구(이하 "최고통지")하고 7일 내에 상대 당사자가 이에 응하지 않을 때 서면통지로써 즉시 계약을 해지할 수 있다. 단, 최고통지에 해지의 의사표시를 기재한 경우에는 별도의 통지 없이 해당 기간의 만료 시 자동적으로 해지된다.',
+      '② "갑"과 "을"은 아래 각호와 같은 상당한 계약위반이나 기타의 사정에 의하여 계약된 용역내용 이행에 중대한 지장이 생긴 경우에는 전항의 규정에도 불구하고 통지하여 즉시 계약을 해지할 수 있다.',
+      '&nbsp;&nbsp;1. 제7조 제1항, 제9조를 위반한 경우',
+      '&nbsp;&nbsp;2. 갑과의 사전 서면 합의 또는 정당한 사유 없이 산출물 제작을 중단하는 경우',
+      '&nbsp;&nbsp;3. 산출물의 완성도가 업계의 통상적인 수준에 현저히 미치지 못한다고 "갑"이 판단하는 경우',
+      '&nbsp;&nbsp;4. 갑이 발행한 어음이나 수표가 부도 또는 거래 정지된 경우',
+      '&nbsp;&nbsp;5. 을이 파산 또는 회생절차 기타 이에 준하는 절차의 신청을 하거나 제작자에 대하여 그러한 절차가 개시되는 경우',
+      '&nbsp;&nbsp;6. 을이 세금을 납부하지 못해 체납처분을 당하거나 주요 재산에 압류·처분·경매신청이 되어 이 계약의 원활한 이행이 곤란한 경우',
+      '&nbsp;&nbsp;7. 영업허가의 취소, 정지 등의 행정처분 또는 이에 준하는 처분을 받아 이 계약의 원활한 이행이 곤란한 경우',
+      '&nbsp;&nbsp;8. 관계 법령·제도의 제·개정, 천재지변 등과 같은 불가항력적 사유가 발생하여 이 계약의 원활한 이행이 곤란한 경우']],
+    ['제13조(손해배상)', [
+      '① "을"이 제5조 제3항의 사유로 "갑"에게 손해를 발생시킨 경우, "을"은 이에 대해 "갑"과 협의하여 손해배상의 책임을 진다.',
+      '② "을"이 제3자의 지적재산권을 침해하여 "갑" 또는 제3자에게 손해를 발생시킨 경우, "을"은 이에 대해 "갑"과 협의하여 손해배상의 책임을 진다.']],
+    ['제14조(계약의 해석)', [
+      '① 본 계약에 명시하지 아니한 사항 및 본 계약 해석상의 이의사항에 관하여는 일반 상관례 내지 관계 법령에 의거하여 상호 협의하여 해결한다.',
+      '② 본 계약은 대한민국 법률에 따라 규율되고 해석된다.']],
+    ['제15조(소송관할)', [
+      '본 계약에 발생하는 모든 분쟁은 상호 원만히 합의하여 해결하며, 이를 통해 해결되지 않은 경우에는 "갑"의 주소지 관할 법원을 제1심 전속적 합의관할법원으로 하여 해결한다.']],
+  ];
+  const artHtml = ARTICLES.map(a =>
+    `<div class="art"><div class="art-t">${a[0]}</div>${a[1].map(p => `<p>${p}</p>`).join('')}</div>`).join('');
+  const rates = [d.번역단가, d.검수단가, d.LQA단가].filter(x => x).map(x => `<div>${esc(x)}</div>`).join('');
+
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>프리랜서 용역 계약서 - ${esc(d.이름)}</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic','맑은 고딕',sans-serif; font-size: 11px; line-height: 1.65; color: #111; margin: 0; padding: 0 0 40px; }
+  .bar { position: sticky; top: 0; background: #1e293b; padding: 10px 16px; display: flex; gap: 8px; align-items: center; }
+  .bar button { background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .bar span { color: #94a3b8; font-size: 12px; }
+  .doc { max-width: 190mm; margin: 16px auto; padding: 0 6mm; }
+  h1 { text-align: center; font-size: 20px; letter-spacing: 8px; margin: 6px 0 18px; }
+  .intro { margin: 10px 0 16px; }
+  .kt-title { text-align: center; font-weight: 700; font-size: 13px; margin: 14px 0 6px; }
+  table.kt { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.kt th, table.kt td { border: 1px solid #333; padding: 6px 8px; vertical-align: top; }
+  table.kt th { width: 90px; background: #f2f4f7; font-weight: 700; text-align: center; white-space: nowrap; }
+  .art { margin: 12px 0; page-break-inside: avoid; }
+  .art-t { font-weight: 700; margin-bottom: 3px; }
+  .art p { margin: 2px 0; }
+  .closing { margin: 18px 0; }
+  .datewrap { text-align: right; margin: 20px 0 24px; font-weight: 700; }
+  .sign { display: flex; gap: 24px; flex-wrap: wrap; }
+  .party { flex: 1; min-width: 240px; border-top: 2px solid #111; padding-top: 8px; }
+  .party h3 { margin: 0 0 6px; font-size: 13px; }
+  .prow { display: flex; margin: 3px 0; }
+  .prow .l { width: 92px; color: #444; flex-shrink: 0; }
+  .prow .v { flex: 1; }
+  @media print { .bar { display: none; } .doc { margin: 0 auto; } }
+</style></head>
+<body>
+<div class="bar"><button onclick="window.print()">🖨️ 인쇄(PDF)</button><span>인쇄 대화상자에서 "대상 → PDF로 저장"을 선택하세요.</span></div>
+<div class="doc">
+  <h1>프리랜서 용역 계약서</h1>
+  <div class="intro">㈜쿡앱스와 (이하 "갑"이라 한다) <b>${esc(d.이름)}</b> (이하 "을"이라 한다)은 상호 신의 성실의 원칙에 입각하여 <b>${esc(d.업무)}</b> (이하 "업무"라 한다)에 관련하여 다음과 같이 계약을 체결한다.</div>
+
+  <div class="kt-title">주요 계약내용</div>
+  <table class="kt">
+    <tr><th>계약명</th><td>${esc(d.업무)}</td></tr>
+    <tr><th>계약기간</th><td>${esc(d.기간)}<br>단, 계약기간 만료일 10일 전까지 "을"로부터 반대의사 표시가 없을 경우 본 계약은 1개월씩 동일 조건으로 자동 갱신</td></tr>
+    <tr><th>계약금액</th><td>"갑"의 요청에 부합하는 결과물 납부 시 용역 대금은 아래와 같이 산정.${rates ? '<br>' + rates : ''}</td></tr>
+    <tr><th>지급조건</th><td>"갑"의 검수 완료 후 매 월말 작업내용에 따른 거래명세서 발행<br>거래명세서 발행일로부터 2주 이내 지급</td></tr>
+    <tr><th>지급방법</th><td>"을"이 정한 ${esc(d.계좌) || '입금은행 / 계좌번호'} 계좌 입금</td></tr>
+    <tr><th>별첨</th><td>1. 거래명세서 (양식)</td></tr>
+  </table>
+
+  ${artHtml}
+
+  <div class="closing">본 계약의 성립을 증명하기 위하여 본 계약서를 2부 작성하여 "갑"과 "을"이 2부에 기명날인 한 후 각 1부씩을 보관한다.</div>
+
+  <div class="datewrap">계약일 : ${esc(d.계약일)}</div>
+
+  <div class="sign">
+    <div class="party">
+      <h3>「갑」</h3>
+      <div class="prow"><span class="l">회사명</span><span class="v">㈜쿡앱스</span></div>
+      <div class="prow"><span class="l">주소</span><span class="v">경기도 성남시 분당구 대왕판교로 660, 비동 801호(삼평동, 유스페이스1)</span></div>
+      <div class="prow"><span class="l">사업자번호</span><span class="v">220-87-92691</span></div>
+      <div class="prow"><span class="l">대표</span><span class="v">박 성 민 &nbsp;&nbsp;(인)</span></div>
+      <div class="prow"><span class="l">담당자</span><span class="v">${esc(d.담당자)} &nbsp;&nbsp;(인)</span></div>
+    </div>
+    <div class="party">
+      <h3>「을」</h3>
+      <div class="prow"><span class="l">성명</span><span class="v">${esc(d.이름)} &nbsp;&nbsp;(인)</span></div>
+      <div class="prow"><span class="l">${esc(d.신분증라벨)}</span><span class="v">${esc(d.신분증)}</span></div>
+      <div class="prow"><span class="l">주소</span><span class="v">${esc(d.주소)}</span></div>
+      <div class="prow"><span class="l">연락처</span><span class="v">${esc(d.연락처)}</span></div>
+    </div>
+  </div>
+</div>
+</body></html>`;
 }
 
 // ── 게임별 프리랜서 TM 시트 링크 (번역 요청 메시지에 하이퍼링크로 첨부) ──
