@@ -766,7 +766,7 @@ function tryUnlock(){
 // ──────────────────────────────────────────────────────────
 // 상수
 // ──────────────────────────────────────────────────────────
-const SHEET_TO_INFO = {
+const ROSTER_DEFAULT = {
   "관정희(TW)":     { 영문명: "KUAN TENG HIN",          언어: "중국어" },
   "채민정(TW)":     { 영문명: "TSAI MENG TING",          언어: "중국어" },
   "남폰(TH)":       { 영문명: "NUMFON TANOMJIT",         언어: "태국어" },
@@ -785,6 +785,41 @@ const SHEET_TO_INFO = {
   "쑤파난(TH)":     { 영문명: "Suparnun Tantiwongsakorn", 언어: "태국어" },
   "차니카(TH)":     { 영문명: "SOMSAARD CHANIKA",         언어: "태국어" },
 };
+
+// 프리랜서 로스터: 기본값(코드) + 관리시트 'List' 탭의 '탭 이름' 열에서 자동 생성(병합)
+// → 새 프리랜서는 시트에 행+'탭 이름'만 채우면 자동 반영 (코드 수정 불필요)
+let SHEET_TO_INFO = Object.assign({}, ROSTER_DEFAULT);
+
+// 탭이름 접미사 코드(EN/TH/TW…) → 언어 (기본 로스터에서 도출, '언어' 열 없을 때 폴백)
+const CODE_LANG = (function () {
+  const m = {};
+  for (const k in ROSTER_DEFAULT) {
+    const mm = k.match(/\(([^)]+)\)\s*$/);
+    if (mm) m[mm[1].toUpperCase()] = ROSTER_DEFAULT[k].언어;
+  }
+  return m;
+})();
+
+function buildRosterFromSheet(wb) {
+  if (!wb.SheetNames || !wb.SheetNames.includes('List')) return null;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets['List'], { defval: '' });
+  const roster = {};
+  let found = 0;
+  for (const row of rows) {
+    let tab = '';
+    for (const key in row) {
+      if (String(key).replace(/\s/g, '') === '탭이름') { tab = String(row[key] || '').trim(); break; }
+    }
+    if (!tab) continue;
+    const name = String(row['이름'] || row['영문 이름'] || '').trim();
+    if (!name) continue;
+    let lang = String(row['언어'] || '').trim();
+    if (!lang) { const mm = tab.match(/\(([^)]+)\)\s*$/); if (mm) lang = CODE_LANG[mm[1].toUpperCase()] || ''; }
+    roster[tab] = { 영문명: name, 언어: lang };
+    found++;
+  }
+  return found ? roster : null;
+}
 
 const COMPANY = {
   name: "(주)쿡앱스",
@@ -866,6 +901,7 @@ function loadWorkbookFromArrayBuffer(ab, name) {
   g_wb = wb;
   g_fromCache = false;
   g_listInfo = loadListInfo(wb);
+  SHEET_TO_INFO = Object.assign({}, ROSTER_DEFAULT, buildRosterFromSheet(wb) || {});
   setFileLoaded(name);
   try {
     const safeWb = XLSX.read(new Uint8Array(ab), { type: 'array', cellDates: false });
@@ -955,6 +991,7 @@ function clearExcelFile() {
     g_wb = wb;
     g_fromCache = true;   // 캐시엔 주민번호·주소가 없음 → 거래명세서 생성 시 재업로드 필요
     g_listInfo = loadListInfo(wb);
+    SHEET_TO_INFO = Object.assign({}, ROSTER_DEFAULT, buildRosterFromSheet(wb) || {});
     setFileLoaded(name);
   } catch(e) { console.warn('파일 복원 실패:', e); }
 })();
