@@ -625,7 +625,7 @@ function tryUnlock(){
 <!-- ── 번역 요청 뷰 ── -->
 <div class="view" id="view-request">
   <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
-  <div class="invoice-card" style="flex:0 0 400px;padding:26px 26px">
+  <div class="invoice-card" style="flex:0 0 360px;padding:24px">
     <h2>번역 요청</h2>
     <p class="sub">프리랜서에게 작업 요청을 보냅니다. ✅ 누르면 관리시트에 자동 기록, 🎉 누르면 완료 알림이 옵니다.</p>
 
@@ -704,7 +704,7 @@ function tryUnlock(){
   </div>
 
   <!-- 요청 현황 보드 -->
-  <div class="invoice-card" style="flex:1 1 auto;min-width:520px;max-width:none">
+  <div class="invoice-card" style="flex:1 1 0;min-width:0;max-width:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
       <h2 style="margin:0">요청 현황</h2>
       <button onclick="loadRequestBoard()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;font-family:inherit">🔄 새로고침</button>
@@ -2456,9 +2456,10 @@ function renderRequestBoard(rows) {
       <th style="padding:9px 8px">프리랜서</th><th style="padding:9px 8px">게임</th><th style="padding:9px 8px">품명</th>
       <th style="padding:9px 8px;white-space:nowrap">마감</th><th style="padding:9px 8px;white-space:nowrap">상태</th><th style="padding:9px 8px;white-space:nowrap">작업시트</th><th style="padding:9px 8px;white-space:nowrap">검수</th><th style="padding:9px 8px;white-space:nowrap">보낸시각</th>
     </tr></thead><tbody>`;
-  const reviewBtn = r => (r.status === 'done' && r.work_sheet)
-    ? `<button onclick="reviewFromRequest('${esc(r.work_sheet)}','${esc((r.game || '') + ' · ' + (r.item || ''))}')" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔍 검수</button>`
-    : '';
+  const reviewBtn = r => `<button onclick="reviewFromRequest('${esc(r.work_sheet)}','${esc((r.game || '') + ' · ' + (r.item || ''))}')" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔍 검수</button>`;
+  // 완료된 건(묶음)만, 묶음의 첫 행에 검수 버튼 하나
+  const doneKeys = new Set();
+  for (const r of rows) { if (r.status === 'done') doneKeys.add([r.game, r.item, r.deadline, r.work_sheet].join('|')); }
   let prevKey = null;
   for (const r of rows) {
     const gkey = [r.game, r.item, r.deadline, r.work_sheet].join('|');
@@ -2472,7 +2473,7 @@ function renderRequestBoard(rows) {
       <td style="padding:9px 8px;white-space:nowrap">${dDate(r.deadline)}</td>
       <td style="padding:9px 8px;white-space:nowrap">${badge(r.status)}</td>
       <td style="padding:9px 8px;white-space:nowrap">${isNewGroup ? sheetCell(r.work_sheet) : ''}</td>
-      <td style="padding:9px 8px;white-space:nowrap">${reviewBtn(r)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${(isNewGroup && r.work_sheet && doneKeys.has(gkey)) ? reviewBtn(r) : ''}</td>
       <td style="padding:9px 8px;color:#94a3b8;white-space:nowrap">${sentAt(r.created_at)}</td>
     </tr>`;
   }
