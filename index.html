@@ -2445,7 +2445,8 @@ function renderRequestBoard(rows) {
     : s === 'accepted' ? '<span style="color:#2563eb;font-weight:700">✅ 수락</span>'
     : '<span style="color:#94a3b8;font-weight:700">⏳ 대기중</span>';
   const dDate = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 6 ? `${d.slice(2,4)}.${d.slice(4,6)}` : (d || '-'); };
-  const sentAt = ts => { if (!ts) return '-'; const t = new Date(ts); return `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; };
+  const dDateTime = r => { const t = String(r.deadline_time || '').trim(); return dDate(r.deadline) + (t ? ` ${t}시` : ''); };
+  const sentAt = ts => { if (!ts) return '-'; const t = new Date(ts); return `${t.getMonth()+1}/${t.getDate()}`; };
 
   const sheetCell = ws => ws
     ? `<a href="${esc(ws)}" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:none;font-weight:600;white-space:nowrap">바로가기 ↗</a>`
@@ -2454,7 +2455,7 @@ function renderRequestBoard(rows) {
   let html = `<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:2px solid #e0e6ef;color:#64748b;text-align:left">
       <th style="padding:9px 8px">프리랜서</th><th style="padding:9px 8px">게임</th><th style="padding:9px 8px">품명</th>
-      <th style="padding:9px 8px;white-space:nowrap">마감</th><th style="padding:9px 8px;white-space:nowrap">상태</th><th style="padding:9px 8px;white-space:nowrap">작업시트</th><th style="padding:9px 8px;white-space:nowrap">검수</th><th style="padding:9px 8px;white-space:nowrap">보낸시각</th>
+      <th style="padding:9px 8px;white-space:nowrap">마감</th><th style="padding:9px 8px;white-space:nowrap">상태</th><th style="padding:9px 8px;white-space:nowrap">작업시트</th><th style="padding:9px 8px;white-space:nowrap">검수</th><th style="padding:9px 8px;white-space:nowrap">보낸날짜</th>
     </tr></thead><tbody>`;
   const reviewBtn = r => `<button onclick="reviewFromRequest('${esc(r.work_sheet)}','${esc((r.game || '') + ' · ' + (r.item || ''))}')" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔍 검수</button>`;
   // 완료된 건(묶음)만, 묶음의 첫 행에 검수 버튼 하나
@@ -2470,7 +2471,7 @@ function renderRequestBoard(rows) {
       <td style="padding:9px 8px;font-weight:600">${esc(r.freelancer_name)}</td>
       <td style="padding:9px 8px;white-space:nowrap">${esc(r.game || '-')}</td>
       <td style="padding:9px 8px">${esc(r.item || '-')}</td>
-      <td style="padding:9px 8px;white-space:nowrap">${dDate(r.deadline)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">${dDateTime(r)}</td>
       <td style="padding:9px 8px;white-space:nowrap">${badge(r.status)}</td>
       <td style="padding:9px 8px;white-space:nowrap">${isNewGroup ? sheetCell(r.work_sheet) : ''}</td>
       <td style="padding:9px 8px;white-space:nowrap">${(isNewGroup && r.work_sheet && doneKeys.has(gkey)) ? reviewBtn(r) : ''}</td>
