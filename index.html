@@ -2863,8 +2863,11 @@ function blobToBase64(blob) {
 // POST는 CORS로 응답을 못 읽으므로, 이후 JSONP(invoiceCheck)로 성공 여부를 확인한다.
 // 반환: { ok: true/false, filename }  — ok=false면 호출부에서 로컬 다운로드로 폴백.
 async function saveInvoiceToDrive(r, year, month, filenameBase, blob) {
-  const 이름    = r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명;
-  const filename = filenameBase + '.pdf';
+  // 이름/언어에 원본 시트발 줄바꿈(\r\n)이 섞여 있을 수 있어 제거 후 사용
+  const 이름    = String(r.info ? (r.info['이름'] || r.sheetMeta.영문명) : r.sheetMeta.영문명).replace(/[\r\n]+/g, ' ').trim();
+  const filename = `${year}.${String(month).padStart(2,'0')}_${이름}_거래명세서.pdf`;  // 정제된 이름으로 재조립
+  let proj      = String(r.sheetMeta.언어 || '').replace(/[\r\n]+/g, '').trim();       // "중국어\n(번체, 간체)" → "중국어(번체, 간체)"
+  proj          = PROJECT_NAME_MAP[proj] || proj;
   const net      = calcNetPay(r.소계, r.usd);
   const payload  = {
     action: 'saveInvoice',
@@ -2872,7 +2875,7 @@ async function saveInvoiceToDrive(r, year, month, filenameBase, blob) {
     pdfBase64: await blobToBase64(blob),
     year, month,
     contractName: 이름,
-    project: PROJECT_NAME_MAP[r.sheetMeta.언어] || r.sheetMeta.언어 || '',
+    project: proj,
     email:   r.info ? (r.info['이메일'] || '') : '',
     account: r.info ? (r.info['계좌정보'] || '') : '',
     amount:  r.usd ? net : Math.round(net),
