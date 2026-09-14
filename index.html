@@ -2555,7 +2555,7 @@ async function runReview() {
   const col = sel.value;
   const colName = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '';
   const rr = document.getElementById('review_result');
-  rr.innerHTML = '<div style="padding:14px;color:#64748b">🤖 AI 검수 중... (수십 초 걸릴 수 있어요)</div>';
+  rr.innerHTML = '<div style="padding:14px;color:#64748b">🤖 AI 검수 중... (최대 2~3분 걸릴 수 있어요)</div>';
   try {
     const url = TM_WEBAPP_URL + '?action=review&url=' + encodeURIComponent(g_reviewUrl)
       + '&col=' + encodeURIComponent(col) + '&lang=' + encodeURIComponent(colName);
@@ -2570,25 +2570,34 @@ async function runReview() {
 function renderReviewResult(res) {
   const rr = document.getElementById('review_result');
   const items = res.findings || [];
+  const color = t => t === 'tag' ? '#ef4444' : t === 'missing' ? '#d97706' : t === 'mistrans' ? '#3b82f6' : t === 'improve' ? '#0891b2' : '#64748b';
+  const label = t => t === 'tag' ? '태그·숫자' : t === 'missing' ? '미번역' : t === 'mistrans' ? '오번역?' : t === 'improve' ? '개선 제안' : t;
+  // 검수 범위 안내 (일부만 검수됐으면 경고)
+  let note = '';
+  if (typeof res.reviewed === 'number' && typeof res.count === 'number') {
+    note = res.truncated
+      ? `<div style="padding:10px 12px;margin-bottom:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;color:#b45309;font-size:12px">⚠️ 시간 관계상 <b>${res.reviewed}/${res.count}행</b>만 검수했어요. 나머지는 다시 실행해 주세요.</div>`
+      : `<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">검수 완료 · 총 ${res.count}행</div>`;
+  }
   if (!items.length) {
-    rr.innerHTML = '<div style="padding:14px;color:#16a34a;font-weight:600">✅ 문제를 찾지 못했어요.</div>';
+    rr.innerHTML = note + '<div style="padding:14px;color:#16a34a;font-weight:600">✅ 오류·개선점을 찾지 못했어요.</div>';
     return;
   }
-  const cnt = { tag: 0, missing: 0, mistrans: 0 };
+  const cnt = { tag: 0, missing: 0, mistrans: 0, improve: 0 };
   items.forEach(i => { if (cnt[i.type] !== undefined) cnt[i.type]++; });
-  const color = t => t === 'tag' ? '#ef4444' : t === 'missing' ? '#d97706' : '#3b82f6';
-  const label = t => t === 'tag' ? '태그·숫자' : t === 'missing' ? '미번역' : '오번역?';
-  let html = `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">`
-    + ['tag', 'missing', 'mistrans'].map(t => `<div style="background:#fff;border:1px solid #e0e6ef;border-radius:8px;padding:8px 14px"><div style="font-size:12px;color:#64748b">${label(t)}</div><div style="font-size:18px;font-weight:700;color:${color(t)}">${cnt[t]}</div></div>`).join('')
+  let html = note + `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">`
+    + ['tag', 'missing', 'mistrans', 'improve'].map(t => `<div style="background:#fff;border:1px solid #e0e6ef;border-radius:8px;padding:8px 14px"><div style="font-size:12px;color:#64748b">${label(t)}</div><div style="font-size:18px;font-weight:700;color:${color(t)}">${cnt[t]}</div></div>`).join('')
     + `</div>`;
   html += `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#64748b;border-bottom:1px solid #e0e6ef">
-    <th style="padding:6px 8px">Token</th><th style="padding:6px 8px">원문</th><th style="padding:6px 8px">번역</th><th style="padding:6px 8px">AI 제안</th></tr></thead><tbody>`;
+    <th style="padding:6px 8px">유형</th><th style="padding:6px 8px">Token</th><th style="padding:6px 8px">원문</th><th style="padding:6px 8px">번역</th><th style="padding:6px 8px">AI 제안</th></tr></thead><tbody>`;
   for (const i of items) {
+    const fix = i.fix ? `<div style="margin-top:3px;color:#0f766e"><b>→ ${esc(i.fix)}</b></div>` : '';
     html += `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:6px 8px;white-space:nowrap;color:${color(i.type)};font-weight:600">${esc(label(i.type))}</td>
       <td style="padding:6px 8px;font-family:monospace;color:${color(i.type)};word-break:break-all">${esc(i.token || '')}</td>
       <td style="padding:6px 8px">${esc(i.src || '')}</td>
       <td style="padding:6px 8px">${esc(i.tgt || '')}</td>
-      <td style="padding:6px 8px;color:#475569">${esc(i.suggestion || '')}</td>
+      <td style="padding:6px 8px;color:#475569">${esc(i.suggestion || '')}${fix}</td>
     </tr>`;
   }
   html += '</tbody></table>';
