@@ -467,6 +467,7 @@ function tryUnlock(){
   <div class="tab" data-tab="detail">상세 내역</div>
   <div class="tab" data-tab="request">번역 요청</div>
   <div class="tab" data-tab="review">AI 검수</div>
+  <div class="tab" data-tab="shots">📷 스샷 검수</div>
   <div class="tab" data-tab="tm">TM 갱신</div>
   <div class="tab" data-tab="broadcast">전체 메세지 발송</div>
   <div class="tab" data-tab="contract">계약서 생성</div>
@@ -736,6 +737,59 @@ function tryUnlock(){
     <div id="review_panel"></div>
   </div>
 </div>
+
+<!-- ── 스샷 검수 뷰 ── -->
+<div class="view" id="view-shots">
+  <div class="invoice-card" style="max-width:1120px">
+    <h2>📷 스샷 검수</h2>
+    <p class="sub">토큰마다 원문·번역·인게임 위치와 <b>실제 스크린샷</b>을 나란히 보며 검수해요. 스샷은 구글 로그인 상태면 바로 보입니다(공개 불필요).</p>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+      <div class="field" style="flex:1;min-width:260px;margin:0">
+        <label>검수 시트 링크</label>
+        <input type="text" id="shots_url" value="https://docs.google.com/spreadsheets/d/1rPU1SuJLFXvM6DD9OhV0EK7d9M1G31kkkBH1vFqRxnU/edit?gid=741211778"
+          style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:9px 11px;outline:none;font-family:inherit;box-sizing:border-box">
+      </div>
+      <div class="field" style="margin:0">
+        <label>검수 언어</label>
+        <select id="shots_lang" style="background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:9px 11px;font-family:inherit">
+          <option value="5">EN</option>
+          <option value="9">JP</option>
+          <option value="7">TC(번체)</option>
+          <option value="8">SC(간체)</option>
+          <option value="6">RU</option>
+          <option value="10">TH</option>
+          <option value="12">PT</option>
+          <option value="13">DE</option>
+          <option value="14">FR</option>
+          <option value="15">ES</option>
+          <option value="16">IT</option>
+          <option value="17">TR</option>
+          <option value="18">ID</option>
+        </select>
+      </div>
+      <button onclick="shotsLoad()" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">불러오기</button>
+      <button onclick="shotsDemo()" style="background:#eef2ff;color:#3b82f6;border:1px solid #c7d2fe;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">데모 보기</button>
+    </div>
+    <div id="shots_status" style="font-size:12px;color:#94a3b8;margin-bottom:10px"></div>
+    <div id="shots_list"></div>
+  </div>
+</div>
+<style>
+  #shots_list .shots-table{border-collapse:collapse;width:100%;font-size:13px}
+  #shots_list th{position:sticky;top:0;background:#f8fafc;border-bottom:2px solid #e2e8f0;padding:9px 10px;text-align:left;color:#475569;font-size:12px;white-space:nowrap;z-index:1}
+  #shots_list td{border-bottom:1px solid #eef2f7;padding:9px 10px;vertical-align:top}
+  #shots_list tr:hover td{background:#fafcff}
+  #shots_list .tok{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:#3b82f6;font-weight:700;max-width:210px;word-break:break-all}
+  #shots_list .kr{max-width:230px;color:#334155;line-height:1.5}
+  #shots_list .en{max-width:230px;color:#0f172a;line-height:1.5}
+  #shots_list .loc{max-width:170px;color:#0f766e;font-size:12px;line-height:1.5}
+  #shots_list .thumb{width:220px;border-radius:6px;border:1px solid #e0e6ef;display:block;cursor:zoom-in;background:#f1f5f9}
+  #shots_list .snone{width:220px;height:70px;border-radius:6px;border:1px dashed #cbd5e1;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px}
+  #shots_list textarea{width:170px;height:58px;border:1.5px solid #e0e6ef;border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box}
+  #shot_lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:99999;cursor:zoom-out}
+  #shot_lightbox img{max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+</style>
+<div id="shot_lightbox" onclick="this.style.display='none'"><img alt=""></div>
 
 <!-- ── TM 갱신 뷰 ── -->
 <div class="view" id="view-tm">
@@ -3266,6 +3320,72 @@ function setInvStatus(type, html) {
   const el = document.getElementById('inv-status');
   el.className = 'inv-status ' + type;
   el.innerHTML = html;
+}
+</script>
+<script>
+// ── 스샷 검수 ──
+const LQA_WEBAPP_URL = 'https://script.google.com/a/macros/cookapps.com/s/AKfycbz3OCiUAJ83YHyxuhwf83s6uFxwsciY6W0QXbkgzQfPUXViK749KFTazCFkA-jbwfSb/exec';
+
+function shotsSheetInfo(){
+  const url = (document.getElementById('shots_url')||{}).value ? document.getElementById('shots_url').value.trim() : '';
+  const mId = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const mGid = url.match(/[?#&]gid=(\d+)/);
+  return { id: mId?mId[1]:'', gid: mGid?mGid[1]:'' };
+}
+function shotsEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function shotZoom(src){ const lb=document.getElementById('shot_lightbox'); lb.querySelector('img').src=src; lb.style.display='flex'; }
+function shotThumb(row){
+  if(row.img) return '<img class="thumb" src="'+row.img+'" onclick="shotZoom(this.src)" alt="">';
+  if(row.fid) return '<img class="thumb" loading="lazy" src="https://lh3.googleusercontent.com/d/'+row.fid+'=w480" onclick="shotZoom(\'https://lh3.googleusercontent.com/d/'+row.fid+'=w1600\')" alt="">';
+  return '<div class="snone">캡처 대기</div>';
+}
+function shotRowHtml(row){
+  return '<tr data-r="'+row.r+'">'
+    + '<td class="tok">'+shotsEsc(row.token)+'</td>'
+    + '<td class="kr">'+shotsEsc(row.kr)+'</td>'
+    + '<td class="en">'+shotsEsc(row.tgt)+'</td>'
+    + '<td class="loc">'+shotsEsc(row.loc||'-')+'</td>'
+    + '<td>'+shotThumb(row)+'</td>'
+    + '<td><textarea placeholder="메모" onchange="shotsSave('+row.r+',this)">'+shotsEsc(row.memo)+'</textarea></td>'
+  + '</tr>';
+}
+function shotsRenderRows(rows){
+  const list=document.getElementById('shots_list');
+  if(!rows||!rows.length){ list.innerHTML='<div style="color:#94a3b8;padding:20px">행이 없습니다.</div>'; return; }
+  const langSel=document.getElementById('shots_lang');
+  const langName=langSel?langSel.options[langSel.selectedIndex].text:'번역';
+  list.innerHTML='<table class="shots-table"><thead><tr><th>토큰</th><th>원문(KR)</th><th>번역('+shotsEsc(langName)+')</th><th>위치</th><th>스샷</th><th>검수 메모</th></tr></thead><tbody>'
+    + rows.map(shotRowHtml).join('') + '</tbody></table>';
+}
+async function shotsLoad(){
+  const st=document.getElementById('shots_status');
+  if(!LQA_WEBAPP_URL){ st.innerHTML='⚠️ 백엔드가 아직 연결되지 않았어요. 우선 <b>데모 보기</b>로 화면을 확인하세요.'; return; }
+  const info=shotsSheetInfo(); const lang=document.getElementById('shots_lang').value;
+  if(!info.id){ st.textContent='시트 링크가 올바르지 않아요.'; return; }
+  st.textContent='⏳ 불러오는 중...';
+  try{
+    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotRows&id='+info.id+'&gid='+info.gid+'&lang='+lang,90000);
+    if(!res||!res.ok) throw new Error((res&&res.error)||'실패');
+    shotsRenderRows(res.rows);
+    st.textContent='총 '+res.rows.length+'행 · 스샷 '+res.rows.filter(x=>x.fid).length+'개';
+  }catch(e){ st.textContent='불러오기 실패: '+e.message; }
+}
+async function shotsSave(r,el){
+  if(!LQA_WEBAPP_URL) return;
+  const info=shotsSheetInfo(); el.style.borderColor='#fbbf24';
+  try{
+    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotSave&id='+info.id+'&gid='+info.gid+'&r='+r+'&memo='+encodeURIComponent(el.value),30000);
+    el.style.borderColor=(res&&res.ok)?'#22c55e':'#ef4444';
+  }catch(e){ el.style.borderColor='#ef4444'; }
+  setTimeout(()=>{el.style.borderColor='#e0e6ef';},1200);
+}
+function shotsDemo(){
+  document.getElementById('shots_status').innerHTML='데모 데이터입니다. (실제 데이터는 백엔드 연결 후 "불러오기")';
+  shotsRenderRows([
+    {r:4,token:'SKILL_ELIZABETH_PASSIVE_DESC',kr:'거미줄에 속박된 적은 매초 공격력의 30%만큼 피해를 입습니다.',tgt:'Enemies bound by a web take damage equal to 30% of Attack each second.',loc:'영웅 > 영웅 상세 > 영웅 스킬(패시브/액티브 설명)',fid:'',memo:''},
+    {r:5,token:'UI_EVENT_3RD_TREASURE_HUNT_BTN_10',kr:'보물찾기',tgt:'Treasure Hunt',loc:'이벤트 > 3주년 > 보물찾기',fid:'',memo:''},
+    {r:6,token:'SHOP_NAME_3200010',kr:'주간 패키지',tgt:'Weekly Package',loc:'상점 > 패키지',fid:'',memo:'용어 통일 확인 필요'},
+  ]);
 }
 </script>
 </body>
