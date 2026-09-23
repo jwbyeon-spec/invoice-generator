@@ -746,7 +746,7 @@ function tryUnlock(){
     <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
       <div class="field" style="flex:1;min-width:260px;margin:0">
         <label>검수 시트 링크</label>
-        <input type="text" id="shots_url" value="https://docs.google.com/spreadsheets/d/1rPU1SuJLFXvM6DD9OhV0EK7d9M1G31kkkBH1vFqRxnU/edit?gid=741211778"
+        <input type="text" id="shots_url" value="https://docs.google.com/spreadsheets/d/1rPU1SuJLFXvM6DD9OhV0EK7d9M1G31kkkBH1vFqRxnU/edit?gid=1969560038"
           style="width:100%;background:#fff;border:1.5px solid #e0e6ef;border-radius:8px;color:#222;font-size:13px;padding:9px 11px;outline:none;font-family:inherit;box-sizing:border-box">
       </div>
       <div class="field" style="margin:0">
@@ -786,6 +786,7 @@ function tryUnlock(){
   #shots_list .thumb{width:220px;border-radius:6px;border:1px solid #e0e6ef;display:block;cursor:zoom-in;background:#f1f5f9}
   #shots_list .snone{width:220px;height:70px;border-radius:6px;border:1px dashed #cbd5e1;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px}
   #shots_list textarea{width:170px;height:58px;border:1.5px solid #e0e6ef;border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box}
+  #shots_list td.en textarea{width:250px;height:92px;font-size:13px;color:#0f172a;line-height:1.5}
   #shot_lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:99999;cursor:zoom-out}
   #shot_lightbox img{max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
 </style>
@@ -3343,10 +3344,9 @@ function shotRowHtml(row){
   return '<tr data-r="'+row.r+'">'
     + '<td class="tok">'+shotsEsc(row.token)+'</td>'
     + '<td class="kr">'+shotsEsc(row.kr)+'</td>'
-    + '<td class="en">'+shotsEsc(row.tgt)+'</td>'
+    + '<td class="en"><textarea class="tgtedit" onchange="shotsSaveTgt('+row.r+',this)">'+shotsEsc(row.tgt)+'</textarea></td>'
     + '<td class="loc">'+shotsEsc(row.loc||'-')+'</td>'
     + '<td>'+shotThumb(row)+'</td>'
-    + '<td><textarea placeholder="메모" onchange="shotsSave('+row.r+',this)">'+shotsEsc(row.memo)+'</textarea></td>'
   + '</tr>';
 }
 function shotsRenderRows(rows){
@@ -3354,7 +3354,7 @@ function shotsRenderRows(rows){
   if(!rows||!rows.length){ list.innerHTML='<div style="color:#94a3b8;padding:20px">행이 없습니다.</div>'; return; }
   const langSel=document.getElementById('shots_lang');
   const langName=langSel?langSel.options[langSel.selectedIndex].text:'번역';
-  list.innerHTML='<table class="shots-table"><thead><tr><th>토큰</th><th>원문(KR)</th><th>번역('+shotsEsc(langName)+')</th><th>위치</th><th>스샷</th><th>검수 메모</th></tr></thead><tbody>'
+  list.innerHTML='<table class="shots-table"><thead><tr><th>토큰</th><th>원문(KR)</th><th>번역('+shotsEsc(langName)+') — 직접 수정 시 시트 반영</th><th>위치</th><th>스샷</th></tr></thead><tbody>'
     + rows.map(shotRowHtml).join('') + '</tbody></table>';
 }
 async function shotsLoad(){
@@ -3370,14 +3370,16 @@ async function shotsLoad(){
     st.textContent='총 '+res.rows.length+'행 · 스샷 '+res.rows.filter(x=>x.fid).length+'개';
   }catch(e){ st.textContent='불러오기 실패: '+e.message; }
 }
-async function shotsSave(r,el){
+async function shotsSaveTgt(r,el){
   if(!LQA_WEBAPP_URL) return;
-  const info=shotsSheetInfo(); el.style.borderColor='#fbbf24';
+  const info=shotsSheetInfo();
+  const col=document.getElementById('shots_lang').value; // 0-based 언어 열 인덱스
+  el.style.borderColor='#fbbf24';
   try{
-    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotSave&id='+info.id+'&gid='+info.gid+'&r='+r+'&memo='+encodeURIComponent(el.value),30000);
+    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotSave&id='+info.id+'&gid='+info.gid+'&r='+r+'&col='+col+'&val='+encodeURIComponent(el.value),30000);
     el.style.borderColor=(res&&res.ok)?'#22c55e':'#ef4444';
   }catch(e){ el.style.borderColor='#ef4444'; }
-  setTimeout(()=>{el.style.borderColor='#e0e6ef';},1200);
+  setTimeout(()=>{el.style.borderColor='#e0e6ef';},1400);
 }
 function shotsDemo(){
   document.getElementById('shots_status').innerHTML='데모 데이터입니다. (실제 데이터는 백엔드 연결 후 "불러오기")';
