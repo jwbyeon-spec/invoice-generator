@@ -3433,13 +3433,20 @@ async function shotsLoad(){
   if(!LQA_WEBAPP_URL){ st.innerHTML='⚠️ 백엔드가 아직 연결되지 않았어요. 우선 <b>데모 보기</b>로 화면을 확인하세요.'; return; }
   const info=shotsSheetInfo(); const lang=document.getElementById('shots_lang').value;
   if(!info.id){ st.textContent='시트 링크가 올바르지 않아요.'; return; }
-  st.textContent='⏳ 불러오는 중...';
-  try{
-    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotRows&id='+info.id+'&gid='+info.gid+'&lang='+lang,90000);
-    if(!res||!res.ok) throw new Error((res&&res.error)||'실패');
-    shotsRenderRows(res.rows);
-    st.textContent='총 '+res.rows.length+'행 · 스샷 '+res.rows.filter(x=>x.fid).length+'개';
-  }catch(e){ st.textContent='불러오기 실패: '+e.message; }
+  const url=LQA_WEBAPP_URL+'?action=shotRows&id='+info.id+'&gid='+info.gid+'&lang='+lang;
+  for(let attempt=1; attempt<=3; attempt++){
+    st.textContent='⏳ 불러오는 중...'+(attempt>1?(' (재시도 '+attempt+'/3)'):'');
+    try{
+      const res=await jsonpCall(url,90000);
+      if(!res||!res.ok) throw new Error((res&&res.error)||'실패');
+      shotsRenderRows(res.rows);
+      st.textContent='총 '+res.rows.length+'행 · 스샷 '+res.rows.filter(x=>x.fid).length+'개';
+      return;
+    }catch(e){
+      if(attempt>=3){ st.textContent='불러오기 실패: '+e.message+' — Ctrl+Shift+R 후 다시 눌러주세요'; }
+      else { await new Promise(r=>setTimeout(r,1200)); }
+    }
+  }
 }
 async function shotsSaveTgt(r,el){
   if(!LQA_WEBAPP_URL) return;
