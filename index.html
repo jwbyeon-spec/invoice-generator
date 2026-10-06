@@ -3386,10 +3386,28 @@ function shotsSheetInfo(){
   return { id: mId?mId[1]:'', gid: mGid?mGid[1]:'' };
 }
 function shotsEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function shotZoom(src){ const lb=document.getElementById('shot_lightbox'); lb.querySelector('img').src=src; lb.style.display='flex'; }
+function shotZoom(src){ if(!src)return; const lb=document.getElementById('shot_lightbox'); lb.querySelector('img').src=src; lb.style.display='flex'; }
+const _shotImgCache={};
+async function shotImgData(fid){
+  if(_shotImgCache[fid]!==undefined) return _shotImgCache[fid];
+  try{
+    const res=await jsonpCall(LQA_WEBAPP_URL+'?action=shotImg&fid='+encodeURIComponent(fid),60000);
+    const uri=(res&&res.ok&&res.b64)?('data:'+(res.mime||'image/jpeg')+';base64,'+res.b64):null;
+    _shotImgCache[fid]=uri; return uri;
+  }catch(e){ return null; }
+}
+async function shotsHydrateImages(){
+  const imgs=[...document.querySelectorAll('#shots_list img.thumb[data-fid]')];
+  for(const im of imgs){
+    const fid=im.getAttribute('data-fid');
+    const uri=await shotImgData(fid);
+    if(uri){ im.src=uri; im.style.opacity='1'; im.onclick=function(){ shotZoom(uri); }; }
+    else { im.style.opacity='1'; im.alt='불러오기 실패'; }
+  }
+}
 function shotThumb(row){
   if(row.img) return '<img class="thumb" src="'+row.img+'" onclick="shotZoom(this.src)" alt="">';
-  if(row.fid) return '<img class="thumb" loading="lazy" src="https://lh3.googleusercontent.com/d/'+row.fid+'=w480" onclick="shotZoom(\'https://lh3.googleusercontent.com/d/'+row.fid+'=w1600\')" alt="">';
+  if(row.fid) return '<img class="thumb" data-fid="'+row.fid+'" alt="" style="min-height:58px;opacity:.3">';
   return '<div class="snone">캡처 대기</div>';
 }
 function shotRowHtml(row){
@@ -3408,6 +3426,7 @@ function shotsRenderRows(rows){
   const langName=langSel?langSel.options[langSel.selectedIndex].text:'번역';
   list.innerHTML='<table class="shots-table"><thead><tr><th>토큰</th><th>원문(KR)</th><th>번역('+shotsEsc(langName)+') — 직접 수정 시 시트 반영</th><th>위치</th><th>스샷</th></tr></thead><tbody>'
     + rows.map(shotRowHtml).join('') + '</tbody></table>';
+  shotsHydrateImages();
 }
 async function shotsLoad(){
   const st=document.getElementById('shots_status');
