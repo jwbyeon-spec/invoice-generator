@@ -1373,6 +1373,12 @@ function copyBtn(btn) {
 function parseBankAccount(raw) {
   const s = String(raw || '').replace(/[\r\n]+/g, ' ').trim();
   if (!s) return null;
+  // 기본 형식 "은행 / 계좌번호". IBAN처럼 영문이 섞인 번호도 있어 공백·하이픈만 빼고 복사
+  const slash = s.indexOf('/');
+  if (slash > -1) {
+    const account = s.slice(slash + 1).trim();
+    return { bank: s.slice(0, slash).trim(), account, copy: account.replace(/[\s-]/g, '') };
+  }
   const m = s.match(/\d[\d\s-]{4,}\d/);
   if (!m) return { bank: s, account: '', copy: '' };
   const account = m[0].trim();
